@@ -1,0 +1,6 @@
+aiodns
+aiohttp
+lxml
+requests
+tabulate
+chardet
