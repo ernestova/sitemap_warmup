@@ -11,7 +11,7 @@ Then it check each URL and return its HTTP response code, Time, Meta Robots, Cac
 
 # Docker
 ```
-docker run -v .:/tmp/ ernestova/sitemap_warmup -s "https://www.checkthem.com/sitemap-phone.xml"  -o -q -c 5 -d 1
+docker run -v .:/tmp/ ernestova/sitemap_warmup -s "https://www.domain.com/sitemap.xml"  -o -q -c 5 -d 1
 ```
 
 # Paramters
