@@ -15,10 +15,10 @@ from urllib.parse import urlparse
 
 parser = argparse.ArgumentParser(description='Asynchronous CDN Cache Warmer')
 parser.add_argument('-s', '--site', action="append", dest='sites', default=None)
-parser.add_argument('-d', '--depth', action="store", dest='depth', default=1)
+parser.add_argument('-d', '--depth', action="store", dest='depth', default=None)
 parser.add_argument('-c', '--concurrency', action="store", dest='concurrency', default=1)
 parser.add_argument('-o', '--output',  action="store_true", default=None)
-parser.add_argument('-q', '--quiet', action="store_true", help="Only print 40x or 50x")
+parser.add_argument('-q', '--quiet', action="store_true", help="Only print 40x, 50x or 200 with noindex")
 args = parser.parse_args()
 concurrency = args.concurrency
 depth = args.depth
@@ -36,6 +36,7 @@ results = []
 time_array = []
 failed_links = 0
 success_links = 0
+
 
 def get_links(mage_links):
     r = requests.get(mage_links)
@@ -106,7 +107,7 @@ async def warm_it(url):
                 dor = ".\n"
                 dot = 0
             else:
-                dor ='.'
+                dor = '.'
 
             print(dor, end='', flush=True)
 
