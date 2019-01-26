@@ -116,7 +116,7 @@ def write_list_to_csv(csv_file, csv_columns, data_list):
     url_file = os.path.basename(a.path)
     filename = url_file.split('.')
 
-    with open('%s.csv' % filename[0], 'w') as csvfile:
+    with open('/tmp/%s.csv' % filename[0], 'w') as csvfile:
         writer = csv.writer(csvfile, dialect='excel', quoting=csv.QUOTE_NONNUMERIC)
         writer.writerow(csv_columns)
         for data in data_list:
