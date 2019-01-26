@@ -11,11 +11,12 @@ Then it check each URL and return its HTTP response code, Time, Meta Robots, Cac
 
 # Docker
 ```
-docker run -v .:/tmp/ ernestova/sitemap_warmup -s "https://www.domain.com/sitemap.xml"  -o -q -c 5 -d 1
+docker run -v ${PWD}:/tmp/ ernestova/sitemap_warmup -s "https://www.domain.com/sitemap.xml"  -c 5 -d 1 -o -q 
 ```
 
-# Paramters
--o to output the results of each sitemap index into its own CSV file. 
--q to display only failed results.
--c to set the concurrency of workers.
--d to set maximum sitemaps to process
+# Parameters
+* -c to set the concurrency of workers.
+* -d to set maximum sitemaps to process
+* -o to output the results of each sitemap index into its own CSV file. 
+* -q to display only failed results.
+
