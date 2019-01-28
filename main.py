@@ -111,7 +111,7 @@ async def warm_it(url):
                 dor = '.'
 
             print(dor, end='', flush=True)
-            del doc
+            del doc, robots, response
 
 
 
