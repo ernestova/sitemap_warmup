@@ -84,7 +84,7 @@ async def warm_it(url):
 
     async with aiohttp.ClientSession(connector=TimedTCPConnector(loop=loop)) as session:
         async with session.get(url) as response:
-            global dot
+            global dot, dot_total
             time_delta = connection_made_time - connection_started_time
             time_taken = "%s sec %s ms" % (time_delta.seconds, time_delta.microseconds)
 
@@ -104,12 +104,15 @@ async def warm_it(url):
 
             dot += 1
             if dot == 100:
-                dor = ".\n"
+                dor = ". %i\n" % dot_total
                 dot = 0
+                dot_total += 100
             else:
                 dor = '.'
 
             print(dor, end='', flush=True)
+            del doc
+
 
 
 def write_list_to_csv(csv_file, csv_columns, data_list):
@@ -138,6 +141,7 @@ iteration = 0
 while sites:
 
     dot = 0
+    dot_total = 0
     tasks = []
     results = []
     time_array = []
