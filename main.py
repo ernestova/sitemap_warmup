@@ -89,6 +89,8 @@ async def warm_it(url):
             time_taken = "%s sec %s ms" % (time_delta.seconds, time_delta.microseconds)
 
             robots_status = ""
+            cache_control = ""
+
             if response.status != 200:
                 response_output = red + str(response.status) + no_color
             else:
@@ -99,8 +101,11 @@ async def warm_it(url):
                 if len(robots) > 0:
                     robots_status = robots[0]
 
+                if 'Cache-Control' in response.headers:
+                    cache_control = response.headers['Cache-Control']
+
             if (quiet is False) or (quiet is True and response.status != 200):
-                results.append([url, response_output, time_taken, robots_status, response.headers['Cache-Control']])
+                results.append([url, response_output, time_taken, robots_status, cache_control])
 
             dot += 1
             if dot == 100:
@@ -112,7 +117,6 @@ async def warm_it(url):
 
             print(dor, end='', flush=True)
             del doc, robots, response
-
 
 
 def write_list_to_csv(csv_file, csv_columns, data_list):
@@ -188,3 +192,4 @@ while sites:
         del mage_links
 
     print("END INTERATION %i \n" % iteration)
+
