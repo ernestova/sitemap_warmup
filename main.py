@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import csv
 import os
 import sys
 import datetime
@@ -26,6 +25,7 @@ sites = args.sites
 quiet = args.quiet
 output = args.output
 
+
 # Colorize #
 red = '\033[0;31m'
 green = '\033[0;32m'
@@ -34,6 +34,8 @@ no_color = '\033[0m'
 tasks = []
 results = []
 time_array = []
+dot = 0
+dot_total = 0
 failed_links = 0
 success_links = 0
 
@@ -86,7 +88,7 @@ async def warm_it(url):
         async with session.get(url) as response:
             global dot, dot_total
             time_delta = connection_made_time - connection_started_time
-            time_taken = "%s sec %s ms" % (time_delta.seconds, time_delta.microseconds)
+            time_taken = "%s.%s" % (time_delta.seconds, time_delta.microseconds)
 
             robots_status = ""
             cache_control = ""
@@ -98,14 +100,18 @@ async def warm_it(url):
                 time_array.append(time_delta)
                 doc = html.fromstring(await response.text())
                 robots = doc.xpath("//meta[@name='robots']/@content")
+
                 if len(robots) > 0:
                     robots_status = robots[0]
+                    if robots_status in 'noindex':
+                        response_output = red + str(response.status) + no_color
 
                 if 'Cache-Control' in response.headers:
-                    cache_control = response.headers['Cache-Control']
+                    current_control = response.headers['Cache-Control'].split(', ')
+                    cache_control = current_control[0].replace('max-age=', '')
 
             if (quiet is False) or (quiet is True and response.status != 200):
-                results.append([url, response_output, time_taken, robots_status, cache_control])
+                results.append([url.replace('https://www.checkthem.com', ''), response_output, time_taken[:-3], robots_status, cache_control])
 
             dot += 1
             if dot == 100:
@@ -131,65 +137,66 @@ def write_list_to_csv(csv_file, csv_columns, data_list):
             writer.writerow(data)
 
 
-if concurrency is None:
-    print("The concurrency limit isn't specified. Setting limit to 150")
-else:
-    print("Setting concurrency limit to %s" % concurrency)
-    print("Quiet: %s" % quiet)
-    print("Output: %s" % output)
+def main():
 
-sem = asyncio.Semaphore(int(concurrency))
-loop = asyncio.get_event_loop()
+    global success_links, failed_links, time_array, results
 
-iteration = 0
-while sites:
+    if concurrency is None:
+        print("The concurrency limit isn't specified. Setting limit to 150")
+    else:
+        print("Setting concurrency limit to %s" % concurrency)
+        print("Quiet: %s" % quiet)
+        print("Output: %s" % output)
 
-    dot = 0
-    dot_total = 0
-    tasks = []
-    results = []
-    time_array = []
-    failed_links = 0
-    success_links = 0
+    iteration = 0
+    while sites:
 
-    current_sites = sites.pop(0)
-    print("#############################################################################################")
-    print("Processing %s" % current_sites)
+        current_sites = sites.pop(0)
+        print("#############################################################################################")
+        print("Processing %s" % current_sites)
 
-    mage_links = get_links(str(current_sites))
+        mage_links = get_links(str(current_sites))
 
-    if len(mage_links) > 0:
-        for i in mage_links:
-            task = asyncio.ensure_future(bound_warms(sem, i))
-            tasks.append(task)
-        loop.run_until_complete(asyncio.wait(tasks))
+        if len(mage_links) > 0:
+            for i in mage_links:
+                task = asyncio.ensure_future(bound_warms(sem, i))
+                tasks.append(task)
+            loop.run_until_complete(asyncio.wait(tasks))
 
-        for res in results:
-            if "200" in res[1]:
-                success_links += 1
-            else:
-                failed_links += 1
+            for res in results:
+                if "200" in res[1]:
+                    success_links += 1
+                else:
+                    failed_links += 1
 
-        avg_time = str((sum([x.total_seconds() for x in time_array]))/len(time_array))
+            avg_time = str((sum([x.total_seconds() for x in time_array]))/len(time_array))
 
-        tab_headers = ['URL', 'Response code', 'Time', 'Meta Robots', 'Cache Control']
+            tab_headers = ['URL', 'Response code', 'Time', 'Meta Robots', 'Cache Control']
 
-        print("\n")
-        print(tabulate(results, showindex=True,
-                       headers=tab_headers))
-        print(tabulate([[str(failed_links), str(success_links), avg_time]],
-                       headers=['Failed', 'Successful', 'Average Time']))
+            print("\n")
+            print(tabulate(results, showindex=True,
+                           headers=tab_headers))
+            print(tabulate([[str(failed_links), str(success_links), avg_time]],
+                           headers=['Failed', 'Successful', 'Average Time']))
 
-        if output is True:
-            write_list_to_csv(current_sites, tab_headers, results)
+            if output is True:
+                write_list_to_csv(current_sites, tab_headers, results)
 
-        iteration += 1
-        if (depth is not False) and iteration == depth:
-            print("Depth level of %i reach" % iteration)
-            exit()
+            iteration += 1
+            if (depth is not False) and iteration == depth:
+                print("Depth level of %i reach" % iteration)
+                exit()
 
-        del results
-        del mage_links
+            del results, mage_links
 
-    print("END INTERATION %i \n" % iteration)
+        print("END INTERATION %i \n" % iteration)
+
+
+if __name__ == "__main__":
+
+    sem = asyncio.Semaphore(int(concurrency))
+    loop = asyncio.get_event_loop()
+
+    # execute only if run as a script
+    main()
 
