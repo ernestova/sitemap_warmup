@@ -38,6 +38,7 @@ dot = 0
 dot_total = 0
 failed_links = 0
 success_links = 0
+domain = ''
 
 
 def get_links(mage_links):
@@ -111,7 +112,7 @@ async def warm_it(url):
                     cache_control = current_control[0].replace('max-age=', '')
 
             if (quiet is False) or (quiet is True and response.status != 200):
-                results.append([url.replace('https://www.checkthem.com', ''), response_output, time_taken[:-3], robots_status, cache_control])
+                results.append([url.replace(domain, ''), response_output, time_taken[:3], robots_status, cache_control])
 
             dot += 1
             if dot == 100:
@@ -139,7 +140,7 @@ def write_list_to_csv(csv_file, csv_columns, data_list):
 
 def main():
 
-    global success_links, failed_links, time_array, results
+    global success_links, failed_links, time_array, results, domain
 
     if concurrency is None:
         print("The concurrency limit isn't specified. Setting limit to 150")
