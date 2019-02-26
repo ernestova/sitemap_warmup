@@ -7,7 +7,7 @@ import functools
 import asyncio
 import aiohttp
 import requests
-import csv
+import pandas as pd
 from lxml import etree, html
 from tabulate import tabulate
 from urllib.parse import urlparse
@@ -32,10 +32,10 @@ green = '\033[0;32m'
 no_color = '\033[0m'
 
 tasks = []
-results = []
+results = pd.DataFrame(columns=['domain', 'http_code', 'time', 'robots_status', 'cache_control'])
 time_array = []
 dot = 0
-dot_total = 0
+dot_total = 100
 failed_links = 0
 success_links = 0
 domain = ''
@@ -87,7 +87,7 @@ async def warm_it(url):
 
     async with aiohttp.ClientSession(connector=TimedTCPConnector(loop=loop)) as session:
         async with session.get(url) as response:
-            global dot, dot_total
+            global dot, dot_total, results
             time_delta = connection_made_time - connection_started_time
             time_taken = "%s.%s" % (time_delta.seconds, time_delta.microseconds)
 
@@ -112,12 +112,17 @@ async def warm_it(url):
                     cache_control = current_control[0].replace('max-age=', '')
 
             if (quiet is False) or (quiet is True and response.status != 200):
-                results.append([url.replace(domain, ''), response_output, time_taken[:3], robots_status, cache_control])
+                res = {'domain': url.replace(domain, ''),
+                       'http_code': response_output,
+                       'time': time_taken[:3],
+                       'robots_status': robots_status,
+                       'cache_control': cache_control}
+                results = results.append(res, ignore_index=True)
 
             dot += 1
             if dot == 100:
                 dor = ". %i\n" % dot_total
-                dot = 0
+                dot = 100
                 dot_total += 100
             else:
                 dor = '.'
@@ -131,11 +136,7 @@ def write_list_to_csv(csv_file, csv_columns, data_list):
     url_file = os.path.basename(a.path)
     filename = url_file.split('.')
 
-    with open('/tmp/%s.csv' % filename[0], 'w') as csvfile:
-        writer = csv.writer(csvfile, dialect='excel', quoting=csv.QUOTE_NONNUMERIC)
-        writer.writerow(csv_columns)
-        for data in data_list:
-            writer.writerow(data)
+    results.to_csv('/tmp/%s.csv' % filename[0], encoding='utf-8', index=False)
 
 
 def main():
@@ -164,8 +165,8 @@ def main():
                 tasks.append(task)
             loop.run_until_complete(asyncio.wait(tasks))
 
-            for res in results:
-                if "200" in res[1]:
+            for index, row in results.iterrows():
+                if "200" in row['http_code']:
                     success_links += 1
                 else:
                     failed_links += 1
