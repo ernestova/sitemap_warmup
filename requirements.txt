@@ -3,4 +3,4 @@ aiohttp
 lxml
 requests
 tabulate
-chardet
+pandas
