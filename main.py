@@ -42,6 +42,7 @@ success_links = 0
 domain = ''
 headers = {'User-Agent': 'Googlebot/2.1 (+http://www.googlebot.com/bot.html)'}
 
+
 def get_links(mage_links):
     r = requests.get(mage_links)
     if "200" not in str(r):
