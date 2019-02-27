@@ -32,6 +32,7 @@ green = '\033[0;32m'
 no_color = '\033[0m'
 
 tasks = []
+tab_headers = ['URL', 'Response code', 'Time (ms)', 'Meta Robots', 'Cache Control']
 results = pd.DataFrame(columns=['domain', 'http_code', 'time', 'robots_status', 'cache_control'])
 time_array = []
 dot = 0
@@ -46,7 +47,7 @@ def get_links(mage_links):
     if "200" not in str(r):
         sys.exit(red + "Sitemap fetch failed for %s with %s. Exiting..." % (mage_links, r) + no_color)
     root = etree.fromstring(r.content)
-    print("The number of sitemap tags are %s" % str((len(root))))
+    print("URLs on sitemap found: %s" % str((len(root))))
     links = []
     for sitemap in root:
         prefix, tag = sitemap.tag.split("}")
@@ -148,15 +149,13 @@ def write_list_to_csv(current_sites, headers, results):
 
 def main():
 
-    global success_links, failed_links, time_array, results, domain
+    global success_links, failed_links, time_array, results, domain, tab_headers
 
     if concurrency is None:
         print("The concurrency limit isn't specified. Setting limit to 150")
     else:
-        print("Setting concurrency limit to %s" % concurrency)
-        print("Quiet: %s" % quiet)
-        print("Output: %s" % output)
-
+        print("Setting concurrency limit to %s Quiet: %s Output: %s" % (concurrency, quiet, output))
+        print("\n")
 
     iteration = 0
     while sites:
@@ -165,8 +164,7 @@ def main():
         domain = urlparse(current_sites)
         domain = domain.scheme+'://'+domain.netloc
 
-        print("#############################################################################################")
-        print("Processing %s" % current_sites)
+        print("SITEMAP: %s" % current_sites)
 
         mage_links = get_links(str(current_sites))
 
@@ -183,8 +181,6 @@ def main():
                     failed_links += 1
 
             avg_time = str((sum([x.total_seconds() for x in time_array]))/len(time_array))
-
-            tab_headers = ['URL', 'Response code', 'Time', 'Meta Robots', 'Cache Control']
 
             print("\n")
             print("Meta Robots: I = index, IF=index/follow, F=noindex, NA = Not Found")
