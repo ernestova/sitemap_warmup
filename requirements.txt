@@ -2,6 +2,6 @@ aiodns
 aiohttp
 lxml
 requests
-tabulate
-pandas
 numpy
+pandas
+tabulate
