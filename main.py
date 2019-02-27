@@ -40,7 +40,7 @@ dot_total = 100
 failed_links = 0
 success_links = 0
 domain = ''
-
+headers = {'User-Agent': 'Googlebot/2.1 (+http://www.googlebot.com/bot.html)'}
 
 def get_links(mage_links):
     r = requests.get(mage_links)
@@ -86,7 +86,7 @@ async def warm_it(url):
             connection_started_time = datetime.datetime.now()
             return await super()._create_connection(req, traces, timeout)
 
-    async with aiohttp.ClientSession(connector=TimedTCPConnector(loop=loop)) as session:
+    async with aiohttp.ClientSession(connector=TimedTCPConnector(loop=loop), headers=headers) as session:
         async with session.get(url) as response:
             global dot, dot_total, results
             time_delta = connection_made_time - connection_started_time
