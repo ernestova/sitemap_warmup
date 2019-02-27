@@ -103,9 +103,16 @@ async def warm_it(url):
                 robots = doc.xpath("//meta[@name='robots']/@content")
 
                 if len(robots) > 0:
-                    robots_status = robots[0]
-                    if robots_status in 'noindex':
+                    robots_status = 'NA'
+                    if robots[0] in 'noindex':
+                        robots_status = 'NI'
                         response_output = red + str(response.status) + no_color
+                    elif robots[0] in 'index':
+                        robots_status = 'I'
+                    elif robots[0] in 'index,follow':
+                        robots_status = 'IF'
+                else:
+                    robots_status = 'NA'
 
                 if 'Cache-Control' in response.headers:
                     current_control = response.headers['Cache-Control'].split(', ')
@@ -131,8 +138,8 @@ async def warm_it(url):
             del doc, robots, response
 
 
-def write_list_to_csv(csv_file, csv_columns, data_list):
-    a = urlparse(csv_file)
+def write_list_to_csv(current_sites, headers, results):
+    a = urlparse(current_sites)
     url_file = os.path.basename(a.path)
     filename = url_file.split('.')
 
@@ -150,10 +157,14 @@ def main():
         print("Quiet: %s" % quiet)
         print("Output: %s" % output)
 
+
     iteration = 0
     while sites:
 
         current_sites = sites.pop(0)
+        domain = urlparse(current_sites)
+        domain = domain.scheme+'://'+domain.netloc
+
         print("#############################################################################################")
         print("Processing %s" % current_sites)
 
@@ -166,7 +177,7 @@ def main():
             loop.run_until_complete(asyncio.wait(tasks))
 
             for index, row in results.iterrows():
-                if "200" in row['http_code']:
+                if "200" in row["http_code"]:
                     success_links += 1
                 else:
                     failed_links += 1
@@ -176,6 +187,7 @@ def main():
             tab_headers = ['URL', 'Response code', 'Time', 'Meta Robots', 'Cache Control']
 
             print("\n")
+            print("Meta Robots: I = index, IF=index/follow, F=noindex, NA = Not Found")
             print(tabulate(results, showindex=True,
                            headers=tab_headers))
             print(tabulate([[str(failed_links), str(success_links), avg_time]],
