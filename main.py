@@ -36,7 +36,7 @@ tab_headers = ['URL', 'Response code', 'Time (ms)', 'Meta Robots', 'Cache Contro
 results = pd.DataFrame(columns=['domain', 'http_code', 'time', 'robots_status', 'cache_control'])
 time_array = []
 dot = 0
-dot_total = 100
+dot_total = 0
 failed_links = 0
 success_links = 0
 domain = ''
@@ -106,12 +106,12 @@ async def warm_it(url):
 
                 if len(robots) > 0:
                     robots_status = 'NA'
-                    if robots[0] in 'noindex':
+                    if 'noindex' in robots[0]:
                         robots_status = 'NI'
                         response_output = red + str(response.status) + no_color
-                    elif robots[0] in 'index':
+                    elif 'index' in robots[0]:
                         robots_status = 'I'
-                    elif robots[0] in 'index,follow':
+                    elif 'index,follow' in robots[0]:
                         robots_status = 'IF'
                 else:
                     robots_status = 'NA'
@@ -131,7 +131,7 @@ async def warm_it(url):
             dot += 1
             if dot == 100:
                 dor = ". %i\n" % dot_total
-                dot = 100
+                dot = 0
                 dot_total += 100
             else:
                 dor = '.'
