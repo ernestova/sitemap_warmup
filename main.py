@@ -160,7 +160,7 @@ def main():
 
     iteration = 0
     while sites:
-
+        results = None
         current_sites = sites.pop(0)
         domain = urlparse(current_sites)
         domain = domain.scheme+'://'+domain.netloc
@@ -174,12 +174,13 @@ def main():
                 task = asyncio.ensure_future(bound_warms(sem, i))
                 tasks.append(task)
             loop.run_until_complete(asyncio.wait(tasks))
-
-            for index, row in results.iterrows():
-                if "200" in row["http_code"]:
-                    success_links += 1
-                else:
-                    failed_links += 1
+            
+            if results is not None:
+                for index, row in results.iterrows():
+                    if "200" in row["http_code"]:
+                        success_links += 1
+                    else:
+                        failed_links += 1
 
             avg_time = str((sum([x.total_seconds() for x in time_array]))/len(time_array))
 
