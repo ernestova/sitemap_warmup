@@ -1,4 +1,4 @@
-![Docker Badge](https://img.shields.io/docker/build/ernestova/sitemap_warmup.svg)
+[![Build Status](https://travis-ci.org/ernestova/sitemap_warmup.svg?branch=master)](https://travis-ci.org/ernestova/sitemap_warmup)
 
 # Sitemap WarmUp
 Sitemap Validation, Checker and CDN Warmup
