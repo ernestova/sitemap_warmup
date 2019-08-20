@@ -120,23 +120,25 @@ async def warm_it(url):
                     current_control = response.headers['Cache-Control'].split(', ')
                     cache_control = current_control[0].replace('max-age=', '')
 
-            if (quiet is False) or (quiet is True and response.status != 200):
+            if (quiet is False) or ((quiet is True) and (response.status != 200)):
                 res = {'domain': url.replace(domain, ''),
                        'http_code': response_output,
-                       'time': time_taken[:3],
+                       'time': time_taken[:5],
                        'robots_status': robots_status,
                        'cache_control': cache_control}
                 results = results.append(res, ignore_index=True)
 
-            dot += 1
-            if dot == 100:
-                dor = ". %i\n" % dot_total
-                dot = 0
-                dot_total += 100
-            else:
-                dor = '.'
+            if quiet is False:
+                dot += 1
+                if dot == 100:
+                    dor = ". %i\n" % dot_total
+                    dot = 0
+                    dot_total += 100
+                else:
+                    dor = '.'
 
-            print(dor, end='', flush=True)
+                print(dor, end='', flush=True)
+
             del doc, robots, response
 
 
@@ -160,7 +162,6 @@ def main():
 
     iteration = 0
     while sites:
-        results = None
         current_sites = sites.pop(0)
         domain = urlparse(current_sites)
         domain = domain.scheme+'://'+domain.netloc
@@ -174,8 +175,8 @@ def main():
                 task = asyncio.ensure_future(bound_warms(sem, i))
                 tasks.append(task)
             loop.run_until_complete(asyncio.wait(tasks))
-            
-            if results is not None:
+
+            if results is not None and isinstance(results, pd.DataFrame) and not results.empty:
                 for index, row in results.iterrows():
                     if "200" in row["http_code"]:
                         success_links += 1
@@ -199,7 +200,8 @@ def main():
                 print("Depth level of %i reach" % iteration)
                 exit()
 
-            del results, mage_links
+            del mage_links
+            results = results.iloc[0:0]
 
         print("END INTERATION %i \n" % iteration)
 
@@ -212,3 +214,6 @@ if __name__ == "__main__":
     # execute only if run as a script
     main()
 
+'''
+            if results is not None:
+'''
