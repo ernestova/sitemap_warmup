@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/ernestova/sitemap_warmup.svg?branch=master)](https://travis-ci.org/ernestova/sitemap_warmup)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fernestova%2Fsitemap_warmup.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fernestova%2Fsitemap_warmup?ref=badge_shield)
 
 # Sitemap WarmUp
 Sitemap Validation, Checker and CDN Warmup
@@ -20,3 +21,7 @@ docker run -v ${PWD}:/tmp/ ernestova/sitemap_warmup -s "https://www.domain.com/s
 * -o to output the results of each sitemap index into its own CSV file. 
 * -q to display only failed results.
 
+
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fernestova%2Fsitemap_warmup.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fernestova%2Fsitemap_warmup?ref=badge_large)
