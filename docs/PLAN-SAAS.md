@@ -67,6 +67,10 @@ Por qué Go encaja:
 Stack propuesto:
 - CLI: `cobra` + config YAML opcional (`sitewarm.yml`).
 - CDN soportados a fondo **desde el MVP**: Cloudflare, Vercel, CloudFront, Fastly y Akamai.
+  Cuando el CDN oculta el estado de caché, se envían sus cabeceras de depuración (p. ej.
+  `Pragma: akamai-x-cache-on`); si aun así no responde, el estado es `unknown` y el reporte
+  explica cómo habilitarlo. Nunca se infiere HIT/MISS por tiempos.
+- Nombre provisional del binario y del módulo: `sitewarm` (puede cambiar antes del lanzamiento).
 - Tests: `httptest` simulando cabeceras de Cloudflare, Fastly, Akamai, CloudFront y Vercel;
   golden files para JSON/SARIF.
 - Release: GoReleaser + firma con cosign; `golangci-lint` en CI (sustituye Travis/Sonar).
@@ -169,7 +173,9 @@ el código queda en el repo privado) y se sigue solo con el open-source hasta qu
 - **Scheduler**: cola en Postgres (`river`) para scans periódicos y por webhook.
 - **Workers regionales**: el mismo binario en **Fly.io** con máquinas fijadas por región
   (Cloudflare Workers no permite elegir la región de salida). Arranque: 6 regiones
-  (iad, sjc, gru, fra, sin, syd) + qro/mex si hay tracción en LatAm.
+  (iad, sjc, gru, fra, sin, syd). Ojo: a octubre de 2026 Fly.io solo tiene **gru** en
+  LatAm (no hay México, Chile ni Colombia); la cobertura LatAm adicional está pendiente
+  (entrevista, ronda 4).
 - **Funciones**: verificación de dominio, matriz región × plantilla (HIT %), historial,
   alertas (email, Slack, webhook), warming post-deploy (webhooks de Vercel, Netlify,
   GitHub y purgas de Cloudflare).
@@ -189,7 +195,9 @@ el código queda en el repo privado) y se sigue solo con el open-source hasta qu
 
 Referencia: warmup.rocks $9 / $23.40 / $59.40 al mes; PageSpeedPlus y Cache Igniter en rangos similares.
 
-Unidad de cobro: **por sitio**, con tope de URLs por plan.
+Unidad de cobro: **por sitio**, con tope de URLs por plan. Un sitio = un hostname (apex y
+`www` cuentan como uno; `es.` o `staging.` son sitios aparte); puede tener varios sitemaps.
+Verificación por DNS TXT, archivo o meta tag (como Google Search Console).
 
 | Plan | Precio | Incluye |
 |---|---|---|

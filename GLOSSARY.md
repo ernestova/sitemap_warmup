@@ -21,5 +21,9 @@ A one-time, free scan of at most 50 URLs from an unverified domain, offered to a
 _Avoid_: Trial, free scan, demo
 
 **Site**:
-The unit a customer pays for; each plan includes a number of sites and a cap on URLs.
-_Avoid_: Project, property, workspace
+One hostname (the apex and its `www` count as one) with one or more sitemaps; the unit a customer pays for.
+_Avoid_: Project, property, workspace, domain
+
+**Cache status**:
+What the CDN reports for one URL at one vantage point: hit, miss, or unknown when the CDN hides it even after asking for its debug headers.
+_Avoid_: Cache state, cache result
