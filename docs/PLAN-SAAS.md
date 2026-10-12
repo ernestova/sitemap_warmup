@@ -173,14 +173,19 @@ Si no se cumplen: **se congela el gasto del SaaS** (se apagan los puntos de sond
 el código queda en el repo privado) y se sigue solo con el open-source hasta que haya señal.
 
 ### Fase 3 — SaaS MVP (4–6 semanas)
-- **API + panel**: Go (`chi` o `net/http`) + Postgres (Neon/Supabase) + front ligero
-  (htmx o Next.js). Auth: pendiente (Clerk vs Cognito vs propio, ronda 5).
+- **API + panel**: API en Go (`chi` o `net/http`) + Postgres + panel en **Next.js**.
+  Auth con **Clerk** ([ADR 0004](adr/0004-clerk-for-authentication.md)); la API valida la
+  sesión de Clerk. Los sitios, su verificación y la suscripción de Stripe pertenecen a una
+  **organización** (Clerk Organizations) desde el día 1; cada usuario empieza con una personal.
 - **Scheduler**: cola en Postgres (`river`) para scans periódicos y por webhook.
 - **Workers regionales**: el mismo binario en **Fly.io** con máquinas fijadas por región
   (Cloudflare Workers no permite elegir la región de salida). Arranque: 6 regiones
   (iad, sjc, gru, fra, sin, syd). Ojo: a octubre de 2026 Fly.io solo tiene **gru** en
   LatAm (no hay México, Chile ni Colombia). Decisión: **segundo proveedor desde el MVP**
-  para cubrir México, Chile y Colombia (proveedor concreto: pendiente, ronda 5).
+  para cubrir México, Chile y Colombia (proveedor concreto: pendiente, ronda 6).
+  Los workers **piden** trabajos a la API por HTTPS saliente (modelo pull,
+  [ADR 0005](adr/0005-regional-workers-pull-jobs.md)): sin puertos abiertos, y sumar un
+  proveedor o región es solo correr el mismo binario.
 - **Funciones**: verificación de sitios, matriz región × plantilla (HIT %), historial,
   alertas (email, Slack, webhook), warming post-deploy (webhooks de Vercel, Netlify,
   GitHub y purgas de Cloudflare).

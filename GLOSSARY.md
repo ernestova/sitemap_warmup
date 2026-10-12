@@ -24,6 +24,10 @@ _Avoid_: Trial, free scan, demo
 One hostname (the apex and its `www` count as one) with one or more sitemaps; the unit a customer pays for.
 _Avoid_: Project, property, workspace, domain
 
+**Organization**:
+The customer account that owns sites, their verification and the subscription; it has one or more members, and every user starts with a personal one.
+_Avoid_: Account, team, workspace, tenant
+
 **Cache status**:
 What the CDN reports for one URL at one vantage point: hit, miss, or unknown when the CDN hides it even after asking for its debug headers.
 _Avoid_: Cache state, cache result
