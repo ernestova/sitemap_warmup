@@ -1,24 +1,30 @@
 # Plan de recalibración: sitemap_warmup → CLI open-source en Go + SaaS
 
-> Estado: borrador v1.1 (2026-10-12). Modelo **open-core**. El CLI en Go es
-> open-source (Apache-2.0) y trabaja desde **un origen: tu origen** (tu máquina, tu servidor
-> o tu runner de CI, con tu IP y tu red); la geolocalización
-> (multi-región), el historial, las alertas y el warming programado son el SaaS de pago.
-> Stripe y la Inc. de Delaware ya existen, así que la facturación y la parte legal no bloquean.
+> Estado: borrador v1.2 (2026-10-12). Modelo **open-core**. El CLI en Go es
+> open-source (Apache-2.0, ver [ADR 0001](adr/0001-apache-license-for-open-core.md)) y trabaja
+> desde **tu punto de sondeo** (tu máquina, tu servidor o tu runner de CI, con tu IP y tu red);
+> los puntos de sondeo regionales, el historial, las alertas y el warming programado son el
+> SaaS de pago. Stripe y la Inc. de Delaware ya existen, así que la facturación y la parte
+> legal no bloquean. Vocabulario: ver [GLOSSARY.md](../GLOSSARY.md) (*origin* = el servidor
+> del sitio detrás del CDN; *vantage point* / punto de sondeo = desde dónde salen las peticiones).
 
 ## 1. Reposicionamiento (lo que cambia respecto al repo actual)
 
-**No** vendemos "pre-calentar tu CDN" (la caché es por PoP, Tiered Cache / Akamai
-Prefetch ya lo resuelven y Google no indexa más rápido por eso).
+**Cliente principal**: desarrolladores y equipos de plataforma que despliegan sitios detrás
+de un CDN; agencias como segundo segmento.
 
-**Sí** vendemos: *"Verifica desde N regiones qué URLs de tu sitemap no se están
-cacheando, por qué, y cuáles no son indexables; y re-calienta solo lo que cambió
-después de un deploy o purge."*
+**Propuesta de valor doble, al mismo nivel**: **calentar** y **diagnosticar**.
+
+*"Calienta tu caché desde N regiones después de cada deploy o purga, y verifica qué URLs de
+tu sitemap no se cachean, por qué, y cuáles no son indexables."*
 
 Ejemplo del mensaje: "Desde 12 regiones, el 40 % de tu sitemap es MISS en CloudFront
 São Paulo: la plantilla `/producto/*` envía `Set-Cookie` y `Cache-Control: private`."
 
-El warming pasa a ser un efecto secundario, no la propuesta de valor.
+Matiz honesto que debe estar en el copy: la caché es por PoP y Tiered Cache / Akamai Prefetch
+ya resuelven parte del problema; calentar desde un solo punto de sondeo solo afecta al PoP más
+cercano, y Google no indexa más rápido por calentar. Por eso el warming útil es el regional
+y post-deploy, y siempre se confirma con una segunda pasada (HIT).
 
 ## 2. Frontera open-source / SaaS
 
@@ -26,7 +32,7 @@ El warming pasa a ser un efecto secundario, no la propuesta de valor.
 |---|---|---|
 | Parseo de sitemap (index, `.gz`, `lastmod`) | ✅ | ✅ |
 | Estado HTTP, TTFB real, redirecciones | ✅ | ✅ |
-| Detección de CDN + HIT/MISS/age | ✅ (desde tu origen) | ✅ (multi-región) |
+| Detección de CDN + HIT/MISS/age | ✅ (desde tu punto de sondeo) | ✅ (puntos de sondeo regionales) |
 | Diagnóstico de no-cacheabilidad por plantilla | ✅ | ✅ + tendencias |
 | Indexabilidad (meta robots, `X-Robots-Tag`, canonical) | ✅ | ✅ |
 | Salida JSON / tabla / SARIF, exit code para CI | ✅ | — |
@@ -37,7 +43,7 @@ El warming pasa a ser un efecto secundario, no la propuesta de valor.
 | Vista multi-sitio para agencias, reportes white-label | ❌ | ✅ |
 | Verificación de dominio, cuotas, rate limiting gestionado | n/a | ✅ obligatorio |
 
-Regla: todo lo que corre **desde tu origen** (tu máquina, tu red, tu CI; ves y calientas
+Regla: todo lo que corre **desde tu punto de sondeo** (tu máquina, tu red, tu CI; ves y calientas
 solo el PoP del CDN más cercano a ti) es libre; todo lo que requiere
 **infraestructura distribuida, estado o tiempo** es de pago.
 
@@ -142,14 +148,16 @@ deploy/fly/            # fly.toml por región
 - Publicar en GitHub Marketplace, Homebrew, Show HN, r/webdev, comunidades de Astro, Next.js
   y WordPress, y comunidades en español.
 
-### 🚦 Puerta de validación (antes de escribir código del SaaS)
-Seguir solo si en ~6 semanas desde el lanzamiento se cumplen **al menos dos**:
+### 📊 Métricas de validación (el SaaS se construye en paralelo)
+Decisión: el SaaS **no espera** a la validación; se construye en paralelo al CLI. Estas
+métricas se siguen igual, a ~6 semanas del lanzamiento, como señal de demanda
+(**al menos dos**):
 - ≥ 300 estrellas o ≥ 50 repos usando la Action.
 - ≥ 100 en la lista de espera con dominio corporativo.
 - ≥ 10 entrevistas, de las cuales ≥ 3 dicen que pagarían por multi-región/alertas.
 - ≥ 3 prepagos (Stripe Payment Link) a precio de fundador.
 
-Si no se cumple: queda como proyecto OSS / portafolio, sin gasto de infraestructura.
+Qué pasa si no se cumplen: pendiente de decidir (ver entrevista, ronda 2).
 
 ### Fase 3 — SaaS MVP (4–6 semanas)
 - **API + panel**: Go (`chi` o `net/http`) + Postgres (Neon/Supabase) + front ligero
@@ -179,7 +187,7 @@ Referencia: warmup.rocks $9 / $23.40 / $59.40 al mes; PageSpeedPlus y Cache Igni
 
 | Plan | Precio | Incluye |
 |---|---|---|
-| OSS | $0 | CLI + Action desde tu origen, ilimitado en tu propia infraestructura |
+| OSS | $0 | CLI + Action desde tu punto de sondeo, ilimitado en tu propia infraestructura |
 | Starter | $12/mes | 1 sitio, 3 regiones, 5k URLs, scan diario, alertas por email |
 | Pro | $39/mes | 5 sitios, 8 regiones, 50k URLs, scan horario + post-deploy, Slack/webhook |
 | Agency | $99/mes | 25 sitios, todas las regiones, white-label, API |
