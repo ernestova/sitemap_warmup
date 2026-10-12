@@ -11,3 +11,15 @@ _Avoid_: Backend, source (and never use it for where requests come from)
 **Vantage point**:
 The place a scan's requests are sent from; the open-source CLI has exactly one (wherever you run it), the hosted service has one per region.
 _Avoid_: Origin, node, probe location
+
+**Verified domain**:
+A domain whose owner has proven control of it to the hosted service; the only kind of domain the hosted service will scan or warm on a schedule or on demand.
+_Avoid_: Claimed domain, registered domain
+
+**Public check**:
+A one-time, free scan of at most 50 URLs from an unverified domain, offered to attract new users.
+_Avoid_: Trial, free scan, demo
+
+**Site**:
+The unit a customer pays for; each plan includes a number of sites and a cap on URLs.
+_Avoid_: Project, property, workspace

@@ -66,6 +66,7 @@ Por qué Go encaja:
 
 Stack propuesto:
 - CLI: `cobra` + config YAML opcional (`sitewarm.yml`).
+- CDN soportados a fondo **desde el MVP**: Cloudflare, Vercel, CloudFront, Fastly y Akamai.
 - Tests: `httptest` simulando cabeceras de Cloudflare, Fastly, Akamai, CloudFront y Vercel;
   golden files para JSON/SARIF.
 - Release: GoReleaser + firma con cosign; `golangci-lint` en CI (sustituye Travis/Sonar).
@@ -124,8 +125,10 @@ deploy/fly/            # fly.toml por región
 - **User-Agent honesto y verificable** (`sitewarm/1.x (+https://<dominio>/bot)`); nunca
   suplantar Googlebot (se verifica por DNS inverso y los WAF lo bloquean).
 - Respetar `robots.txt` por defecto; concurrencia y RPS limitados por defecto.
-- SaaS: **verificación de dominio** (registro DNS TXT o meta tag / archivo) antes de cualquier
-  warming; tope de requests por plan; botón de pausa; IPs de salida publicadas.
+- SaaS: **verificación de dominio** (registro DNS TXT o meta tag / archivo) antes de **cualquier
+  escaneo o warming**, programado o manual ([ADR 0003](adr/0003-verify-domain-before-any-hosted-scan.md)).
+  Única excepción: el **chequeo público** gratuito, una sola vez, ≤ 50 URLs, sin verificar,
+  como gancho de captación. Tope de requests por plan; botón de pausa; IPs de salida publicadas.
 - Cabeceras de diagnóstico opcionales que el cliente puede permitir en su WAF.
 
 ## 5. Fases con puertas de validación
@@ -157,7 +160,8 @@ métricas se siguen igual, a ~6 semanas del lanzamiento, como señal de demanda
 - ≥ 10 entrevistas, de las cuales ≥ 3 dicen que pagarían por multi-región/alertas.
 - ≥ 3 prepagos (Stripe Payment Link) a precio de fundador.
 
-Qué pasa si no se cumplen: pendiente de decidir (ver entrevista, ronda 2).
+Si no se cumplen: **se congela el gasto del SaaS** (se apagan los puntos de sondeo regionales,
+el código queda en el repo privado) y se sigue solo con el open-source hasta que haya señal.
 
 ### Fase 3 — SaaS MVP (4–6 semanas)
 - **API + panel**: Go (`chi` o `net/http`) + Postgres (Neon/Supabase) + front ligero
@@ -184,6 +188,8 @@ Qué pasa si no se cumplen: pendiente de decidir (ver entrevista, ronda 2).
 ## 6. Precios (anclados a la competencia)
 
 Referencia: warmup.rocks $9 / $23.40 / $59.40 al mes; PageSpeedPlus y Cache Igniter en rangos similares.
+
+Unidad de cobro: **por sitio**, con tope de URLs por plan.
 
 | Plan | Precio | Incluye |
 |---|---|---|
