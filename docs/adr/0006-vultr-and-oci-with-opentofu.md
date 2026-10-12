@@ -1,0 +1,3 @@
+# Vultr and OCI for all servers, managed with OpenTofu
+
+All vantage points and the API host run on Vultr, plus Oracle Cloud only for Bogotá (Vultr has no Colombia region), all defined by one OpenTofu module so every vantage point runs the same cloud-init and the same image pinned by digest. Fly.io was the first choice but was dropped: its Terraform provider has been archived since 2023 and it has only São Paulo in Latin America. Vercel was rejected for the API because the scheduler and the workers' long-polling need always-on processes. We accept a fixed monthly cost for always-on VMs in exchange for identical, reproducible machines.

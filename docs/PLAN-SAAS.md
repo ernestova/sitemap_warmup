@@ -121,7 +121,12 @@ cmd/scheduler/         # cola river: scans periódicos y por webhook
 internal/billing/      # Stripe Checkout, Portal, webhooks, cuotas
 internal/domains/      # verificación DNS TXT / meta / archivo
 internal/store/        # Postgres (migraciones, consultas)
-deploy/fly/            # fly.toml por región
+infra/                 # OpenTofu (ADR 0006)
+  modules/vantage_point/   # un módulo: región + proveedor son las únicas variables
+    vultr/  oci/           # implementaciones por proveedor, mismo cloud-init
+  modules/api_host/        # VM de la API + scheduler en Vultr
+  envs/prod/               # lista de puntos de sondeo y versión (digest) de la imagen
+web/                   # panel Next.js (Vercel)
 ```
 
 ## 4. Requisitos innegociables (OSS y SaaS)
@@ -173,16 +178,28 @@ Si no se cumplen: **se congela el gasto del SaaS** (se apagan los puntos de sond
 el código queda en el repo privado) y se sigue solo con el open-source hasta que haya señal.
 
 ### Fase 3 — SaaS MVP (4–6 semanas)
-- **API + panel**: API en Go (`chi` o `net/http`) + Postgres + panel en **Next.js**.
+- **API + panel**: API en Go (`chi` o `net/http`) + Postgres en **Neon** + panel en **Next.js**
+  desplegado en **Vercel**. La API y el scheduler (procesos continuos) corren en una VM de
+  **Vultr** gestionada con OpenTofu, no en Vercel: las funciones serverless no sirven para el
+  scheduler ni para el long-poll de los workers.
   Auth con **Clerk** ([ADR 0004](adr/0004-clerk-for-authentication.md)); la API valida la
   sesión de Clerk. Los sitios, su verificación y la suscripción de Stripe pertenecen a una
   **organización** (Clerk Organizations) desde el día 1; cada usuario empieza con una personal.
 - **Scheduler**: cola en Postgres (`river`) para scans periódicos y por webhook.
-- **Workers regionales**: el mismo binario en **Fly.io** con máquinas fijadas por región
-  (Cloudflare Workers no permite elegir la región de salida). Arranque: 6 regiones
-  (iad, sjc, gru, fra, sin, syd). Ojo: a octubre de 2026 Fly.io solo tiene **gru** en
-  LatAm (no hay México, Chile ni Colombia). Decisión: **segundo proveedor desde el MVP**
-  para cubrir México, Chile y Colombia (proveedor concreto: pendiente, ronda 6).
+- **Puntos de sondeo (workers regionales)**: **Vultr** en todas las regiones + **Oracle
+  Cloud** solo en Bogotá ([ADR 0006](adr/0006-vultr-and-oci-with-opentofu.md)). Vultr tiene
+  33 regiones (verificado en su API, oct. 2026), incluidas `mex`, `scl` y `sao`; Colombia
+  solo existe en OCI (`sa-bogota-1`). Fly.io se descartó: su proveedor de Terraform está
+  archivado desde nov. 2023 y en LatAm solo tiene São Paulo. Cloudflare Workers tampoco
+  sirve porque no permite elegir la región de salida.
+  Arranque propuesto (10): `ewr`, `sjc`, `mia`, `fra`, `lhr`, `sgp`, `syd`, `sao`, `mex`,
+  `scl` + OCI Bogotá.
+- **Infraestructura idéntica**: **OpenTofu** con estado remoto en almacenamiento S3
+  compatible (Cloudflare R2 o Vultr Object Storage) con bloqueo nativo; `plan`/`apply`
+  desde GitHub Actions. Un solo módulo `vantage_point` (la región y el proveedor son las
+  únicas variables), el mismo cloud-init y la misma imagen fijada por **digest**. Cada
+  worker reporta versión y digest en su heartbeat a la API, y un `tofu plan` programado en CI
+  alerta si hay drift. No hacen falta VPCs: los workers solo hacen conexiones salientes.
   Los workers **piden** trabajos a la API por HTTPS saliente (modelo pull,
   [ADR 0005](adr/0005-regional-workers-pull-jobs.md)): sin puertos abiertos, y sumar un
   proveedor o región es solo correr el mismo binario.
@@ -218,10 +235,12 @@ Verificación por DNS TXT, archivo o meta tag (como Google Search Console).
 
 Anual con 2 meses gratis. Precio de fundador −40 % de por vida para los primeros 50.
 
-**Coste unitario estimado**: escanear 50k URLs × 8 regiones es ~400k requests; en Fly
-(shared-cpu, máquinas que se apagan al terminar) cuesta pocos centavos por scan, y el
-egress es mínimo porque se pueden usar peticiones con `Range` o descartar el cuerpo tras
-leer el `<head>`. Margen objetivo > 85 %.
+**Coste**: las VMs de Vultr están siempre encendidas, así que el coste es sobre todo **fijo**:
+~11 VMs × $5–6/mes (10 puntos de sondeo + API) ≈ **$60–70/mes**, más Neon, Vercel y Clerk
+(con planes gratuitos al inicio) y OCI Bogotá (pago por uso, pocos dólares). Escanear 50k
+URLs × 8 regiones son ~400k requests, que caben en esas VMs; el egress es mínimo porque se
+pueden usar peticiones con `Range` o descartar el cuerpo tras leer el `<head>`. Punto de
+equilibrio: ~6 clientes Starter o 2 Pro. Margen objetivo > 85 % a partir de ~30 clientes.
 
 ## 7. Riesgos y mitigaciones
 
