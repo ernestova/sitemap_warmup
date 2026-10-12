@@ -12,12 +12,12 @@ _Avoid_: Backend, source (and never use it for where requests come from)
 The place a scan's requests are sent from; the open-source CLI has exactly one (wherever you run it), the hosted service has one per region.
 _Avoid_: Origin, node, probe location
 
-**Verified domain**:
-A domain whose owner has proven control of it to the hosted service; the only kind of domain the hosted service will scan or warm on a schedule or on demand.
-_Avoid_: Claimed domain, registered domain
+**Verified site**:
+A site whose owner has proven control of it (by DNS, file or meta tag); proving control of a root domain by DNS verifies every site under it. The hosted service only scans or warms verified sites.
+_Avoid_: Verified domain, claimed site, registered domain
 
 **Public check**:
-A one-time, free scan of at most 50 URLs from an unverified domain, offered to attract new users.
+A one-time, free scan of at most 50 URLs from an unverified site, offered in exchange for an email address.
 _Avoid_: Trial, free scan, demo
 
 **Site**:

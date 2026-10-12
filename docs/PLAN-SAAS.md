@@ -129,10 +129,12 @@ deploy/fly/            # fly.toml por región
 - **User-Agent honesto y verificable** (`sitewarm/1.x (+https://<dominio>/bot)`); nunca
   suplantar Googlebot (se verifica por DNS inverso y los WAF lo bloquean).
 - Respetar `robots.txt` por defecto; concurrencia y RPS limitados por defecto.
-- SaaS: **verificación de dominio** (registro DNS TXT o meta tag / archivo) antes de **cualquier
-  escaneo o warming**, programado o manual ([ADR 0003](adr/0003-verify-domain-before-any-hosted-scan.md)).
-  Única excepción: el **chequeo público** gratuito, una sola vez, ≤ 50 URLs, sin verificar,
-  como gancho de captación. Tope de requests por plan; botón de pausa; IPs de salida publicadas.
+- SaaS: **sitio verificado** (archivo o meta tag verifican un sitio; DNS TXT en el dominio
+  raíz verifica todos sus sitios) antes de **cualquier escaneo o warming**, programado o manual
+  ([ADR 0003](adr/0003-verify-site-before-any-hosted-scan.md)).
+  Única excepción: el **chequeo público** gratuito, una sola vez, ≤ 50 URLs, sin verificar;
+  se ve un resultado parcial y el reporte completo llega a cambio del email (alimenta la
+  lista de espera). Tope de requests por plan; botón de pausa; IPs de salida publicadas.
 - Cabeceras de diagnóstico opcionales que el cliente puede permitir en su WAF.
 
 ## 5. Fases con puertas de validación
@@ -156,7 +158,10 @@ deploy/fly/            # fly.toml por región
   y WordPress, y comunidades en español.
 
 ### 📊 Métricas de validación (el SaaS se construye en paralelo)
-Decisión: el SaaS **no espera** a la validación; se construye en paralelo al CLI. Estas
+Decisión: el SaaS **no espera** a la validación; arranca **el día 1** en paralelo al CLI.
+Empieza por lo que no depende del motor (Stripe, verificación de sitios, auth, panel) mientras
+`pkg/sitemap` y `pkg/probe` maduran en el repo OSS; los workers se conectan cuando el motor
+tenga su primera versión etiquetada. Estas
 métricas se siguen igual, a ~6 semanas del lanzamiento, como señal de demanda
 (**al menos dos**):
 - ≥ 300 estrellas o ≥ 50 repos usando la Action.
@@ -169,13 +174,13 @@ el código queda en el repo privado) y se sigue solo con el open-source hasta qu
 
 ### Fase 3 — SaaS MVP (4–6 semanas)
 - **API + panel**: Go (`chi` o `net/http`) + Postgres (Neon/Supabase) + front ligero
-  (htmx o Next.js). Auth: magic link o GitHub OAuth.
+  (htmx o Next.js). Auth: pendiente (Clerk vs Cognito vs propio, ronda 5).
 - **Scheduler**: cola en Postgres (`river`) para scans periódicos y por webhook.
 - **Workers regionales**: el mismo binario en **Fly.io** con máquinas fijadas por región
   (Cloudflare Workers no permite elegir la región de salida). Arranque: 6 regiones
   (iad, sjc, gru, fra, sin, syd). Ojo: a octubre de 2026 Fly.io solo tiene **gru** en
-  LatAm (no hay México, Chile ni Colombia); la cobertura LatAm adicional está pendiente
-  (entrevista, ronda 4).
+  LatAm (no hay México, Chile ni Colombia). Decisión: **segundo proveedor desde el MVP**
+  para cubrir México, Chile y Colombia (proveedor concreto: pendiente, ronda 5).
 - **Funciones**: verificación de dominio, matriz región × plantilla (HIT %), historial,
   alertas (email, Slack, webhook), warming post-deploy (webhooks de Vercel, Netlify,
   GitHub y purgas de Cloudflare).

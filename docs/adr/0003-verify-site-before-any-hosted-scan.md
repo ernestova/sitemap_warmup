@@ -1,0 +1,3 @@
+# Verify site ownership before any hosted scan or warm
+
+The hosted service only scans or warms verified sites, even though a read-only scan looks harmless and an agency may find it inconvenient to prove control of a client's site. Sending traffic from many regional vantage points at a site we don't know the owner of makes us a tool for load attacks and competitor scraping, and gets our egress IPs blocked by WAFs. Control is proven per site by file or meta tag, or for a whole root domain by DNS TXT. The single exception is the public check: one free run of at most 50 URLs, in exchange for an email address.
