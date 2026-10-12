@@ -41,7 +41,7 @@ y post-deploy, y siempre se confirma con una segunda pasada (HIT).
 | Warming programado / disparado por webhook de deploy o purge | ❌ | ✅ |
 | Historial, dashboards, alertas (email/Slack/webhook) | ❌ | ✅ |
 | Vista multi-sitio para agencias, reportes white-label | ❌ | ✅ |
-| Verificación de dominio, cuotas, rate limiting gestionado | n/a | ✅ obligatorio |
+| Verificación de sitios, cuotas, rate limiting gestionado | n/a | ✅ obligatorio |
 
 Regla: todo lo que corre **desde tu punto de sondeo** (tu máquina, tu red, tu CI; ves y calientas
 solo el PoP del CDN más cercano a ti) es libre; todo lo que requiere
@@ -181,7 +181,7 @@ el código queda en el repo privado) y se sigue solo con el open-source hasta qu
   (iad, sjc, gru, fra, sin, syd). Ojo: a octubre de 2026 Fly.io solo tiene **gru** en
   LatAm (no hay México, Chile ni Colombia). Decisión: **segundo proveedor desde el MVP**
   para cubrir México, Chile y Colombia (proveedor concreto: pendiente, ronda 5).
-- **Funciones**: verificación de dominio, matriz región × plantilla (HIT %), historial,
+- **Funciones**: verificación de sitios, matriz región × plantilla (HIT %), historial,
   alertas (email, Slack, webhook), warming post-deploy (webhooks de Vercel, Netlify,
   GitHub y purgas de Cloudflare).
 - **Stripe**: Checkout + Customer Portal + webhooks (`checkout.session.completed`,
@@ -223,7 +223,7 @@ leer el `<head>`. Margen objetivo > 85 %.
 | Riesgo | Mitigación |
 |---|---|
 | Fácil de copiar | Velocidad, comunidad OSS, nicho de diagnóstico por plantilla, español |
-| Abuso (DDoS a terceros) | Verificación de dominio, cuotas, UA honesto, IPs publicadas, AUP |
+| Abuso (DDoS a terceros) | Verificación de sitios, cuotas, UA honesto, IPs publicadas, AUP |
 | Bloqueo por WAF del cliente | Documentar la allowlist de IPs y UA; modo "solo cabeceras" (HEAD) |
 | CDN que añaden funciones nativas | Ser multi-CDN y agnóstico; el valor está en el diagnóstico |
 | Poca demanda | Puerta de validación antes de construir el SaaS |
