@@ -1,7 +1,8 @@
 # Plan de recalibración: sitemap_warmup → CLI open-source en Go + SaaS
 
-> Estado: borrador v1 (2026-10-12). Supuesto: modelo **open-core**. El CLI en Go es
-> open-source (Apache-2.0) y trabaja desde **un solo origen**; la geolocalización
+> Estado: borrador v1.1 (2026-10-12). Modelo **open-core**. El CLI en Go es
+> open-source (Apache-2.0) y trabaja desde **un origen: tu origen** (tu máquina, tu servidor
+> o tu runner de CI, con tu IP y tu red); la geolocalización
 > (multi-región), el historial, las alertas y el warming programado son el SaaS de pago.
 > Stripe y la Inc. de Delaware ya existen, así que la facturación y la parte legal no bloquean.
 
@@ -25,7 +26,7 @@ El warming pasa a ser un efecto secundario, no la propuesta de valor.
 |---|---|---|
 | Parseo de sitemap (index, `.gz`, `lastmod`) | ✅ | ✅ |
 | Estado HTTP, TTFB real, redirecciones | ✅ | ✅ |
-| Detección de CDN + HIT/MISS/age | ✅ (1 origen) | ✅ (multi-región) |
+| Detección de CDN + HIT/MISS/age | ✅ (desde tu origen) | ✅ (multi-región) |
 | Diagnóstico de no-cacheabilidad por plantilla | ✅ | ✅ + tendencias |
 | Indexabilidad (meta robots, `X-Robots-Tag`, canonical) | ✅ | ✅ |
 | Salida JSON / tabla / SARIF, exit code para CI | ✅ | — |
@@ -36,7 +37,8 @@ El warming pasa a ser un efecto secundario, no la propuesta de valor.
 | Vista multi-sitio para agencias, reportes white-label | ❌ | ✅ |
 | Verificación de dominio, cuotas, rate limiting gestionado | n/a | ✅ obligatorio |
 
-Regla: todo lo que corre en **una máquina y un origen** es libre; todo lo que requiere
+Regla: todo lo que corre **desde tu origen** (tu máquina, tu red, tu CI; ves y calientas
+solo el PoP del CDN más cercano a ti) es libre; todo lo que requiere
 **infraestructura distribuida, estado o tiempo** es de pago.
 
 ## 3. Reevaluación tecnológica: Go
@@ -147,7 +149,7 @@ Referencia: warmup.rocks $9 / $23.40 / $59.40 al mes; PageSpeedPlus y Cache Igni
 
 | Plan | Precio | Incluye |
 |---|---|---|
-| OSS | $0 | CLI + Action, 1 origen, ilimitado en tu propia infraestructura |
+| OSS | $0 | CLI + Action desde tu origen, ilimitado en tu propia infraestructura |
 | Starter | $12/mes | 1 sitio, 3 regiones, 5k URLs, scan diario, alertas por email |
 | Pro | $39/mes | 5 sitios, 8 regiones, 50k URLs, scan horario + post-deploy, Slack/webhook |
 | Agency | $99/mes | 25 sitios, todas las regiones, white-label, API |
