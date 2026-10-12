@@ -67,20 +67,50 @@ Stack propuesto:
 Alternativa descartada: Rust (más curva y menos velocidad de iteración para un equipo de una
 persona) y seguir en Python (distribución peor para un CLI/Action y para workers).
 
-**Repositorio**: mismo repo (`ernestova/sitemap_warmup`). Se conservan historial y estrellas,
-se añade `go.mod`, el Python se mueve a `legacy/` y se etiqueta `v0-python`. Se puede
-renombrar el repo después (GitHub redirige). El nombre del producto se decide en la Fase 0.
+**Repositorios: dos repos separados.**
 
-Estructura:
+1. **`ernestova/sitemap_warmup` → open-source (público, Apache-2.0).** Se conserva por sus
+   años de historial, estrellas y credibilidad. La reescritura en Go vive aquí: se añade
+   `go.mod`, el Python se mueve a `legacy/` y se etiqueta `v0-python`. Se puede renombrar más
+   adelante (GitHub redirige las URLs y los remotes).
+2. **Repo nuevo y privado para el SaaS** (p. ej. `ernestova/<producto>-cloud`). Contiene API,
+   panel, scheduler, workers regionales, Stripe e infraestructura. Importa el motor OSS como
+   dependencia Go (`go get github.com/ernestova/sitemap_warmup@vX.Y.Z`), con versiones fijas.
+   El nombre del producto se decide en la Fase 0.
+
+Consecuencias de diseño:
+- En Go, `internal/` **no se puede importar desde otro módulo**: el motor reutilizable va en
+  paquetes públicos `pkg/` con una API estable (semver). Solo el código propio del CLI queda
+  en `internal/`.
+- Nada del SaaS (multi-región, historial, facturación) entra en el repo OSS; así la frontera
+  open-core queda clara y no hay que vigilar fugas.
+- Los workers regionales del SaaS son un `main` del repo privado que llama a `pkg/probe` y
+  `pkg/diagnose`: el mismo motor que usa la comunidad, probado por ella.
+- Las mejoras al motor se hacen primero en el OSS (PR público → release) y después se sube la
+  versión en el SaaS.
+
+Estructura del repo OSS:
 ```
 cmd/sitewarm/          # CLI
-internal/sitemap/      # fetch + parse (index, gz)
-internal/probe/        # cliente HTTP, httptrace, cabeceras
-internal/cdn/          # detección por proveedor (tabla de cabeceras)
-internal/diagnose/     # reglas de cacheabilidad e indexabilidad, agrupado por plantilla
-internal/report/       # tabla, JSON, SARIF, diff
+pkg/sitemap/           # fetch + parse (index, gz)              ← importable por el SaaS
+pkg/probe/             # cliente HTTP, httptrace, cabeceras     ← importable
+pkg/cdn/               # detección por proveedor                ← importable
+pkg/diagnose/          # reglas de cacheabilidad/indexabilidad  ← importable
+pkg/report/            # tabla, JSON, SARIF, diff
+internal/cli/          # flags, config, wiring del CLI
 action.yml             # GitHub Action
-legacy/                # Python original
+legacy/                # Python original (v0-python)
+```
+
+Estructura del repo SaaS (privado):
+```
+cmd/api/               # API + panel
+cmd/worker/            # worker regional (usa pkg/ del OSS)
+cmd/scheduler/         # cola river: scans periódicos y por webhook
+internal/billing/      # Stripe Checkout, Portal, webhooks, cuotas
+internal/domains/      # verificación DNS TXT / meta / archivo
+internal/store/        # Postgres (migraciones, consultas)
+deploy/fly/            # fly.toml por región
 ```
 
 ## 4. Requisitos innegociables (OSS y SaaS)
@@ -174,6 +204,8 @@ leer el `<head>`. Margen objetivo > 85 %.
 ## 8. Próximos pasos inmediatos
 
 1. Elegir nombre y dominio; crear la landing con lista de espera (Stripe Payment Link de fundador).
-2. Crear la rama `go-rewrite`: `go.mod`, mover el Python a `legacy/`, esqueleto de `cmd/` e `internal/`.
+2. En el repo OSS, crear la rama `go-rewrite`: `go.mod`, mover el Python a `legacy/`, esqueleto de `cmd/` y `pkg/`.
+   Crear el repo privado del SaaS solo después de pasar la puerta de validación (puede existir
+   vacío antes para reservar el nombre).
 3. Implementar `internal/sitemap` + `internal/probe` con tests `httptest`.
 4. Publicar `v0.1.0` del CLI + Action y empezar a medir contra la puerta de validación.
