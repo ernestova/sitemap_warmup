@@ -10,7 +10,7 @@ body:
         **Wrong cache state** form instead.
 
         Do not paste cookies, tokens or private hostnames. Security issues go to
-        [private vulnerability reporting](https://github.com/ernestova/sitemap_warmup/security/advisories/new).
+        [private vulnerability reporting](https://github.com/clarivo-co/sitewarm/security/advisories/new).
   - type: input
     id: version
     attributes:

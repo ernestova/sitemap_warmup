@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ernestova/sitemap_warmup/pkg/sitewarm"
+	"github.com/clarivo-co/sitewarm/pkg/sitewarm"
 )
 
 // cdnServer emulates a CDN edge: the first `misses` requests per URL and

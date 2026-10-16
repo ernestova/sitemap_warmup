@@ -4,9 +4,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ernestova/sitemap_warmup/internal/cdn"
-	"github.com/ernestova/sitemap_warmup/internal/probe"
-	"github.com/ernestova/sitemap_warmup/internal/verify"
+	"github.com/clarivo-co/sitewarm/internal/cdn"
+	"github.com/clarivo-co/sitewarm/internal/probe"
+	"github.com/clarivo-co/sitewarm/internal/verify"
 )
 
 func TestDefaultFailOn(t *testing.T) {

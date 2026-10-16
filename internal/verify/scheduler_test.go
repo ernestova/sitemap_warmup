@@ -10,8 +10,8 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/ernestova/sitemap_warmup/internal/cdn"
-	"github.com/ernestova/sitemap_warmup/internal/probe"
+	"github.com/clarivo-co/sitewarm/internal/cdn"
+	"github.com/clarivo-co/sitewarm/internal/probe"
 )
 
 // defaults mirrors the documented CLI defaults.

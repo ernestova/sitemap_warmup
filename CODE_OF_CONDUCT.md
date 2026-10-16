@@ -61,7 +61,7 @@ representative at an online or offline event.
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement, the maintainer
 [@ernestova](https://github.com/ernestova), through GitHub. To report privately,
-use [private vulnerability reporting](https://github.com/ernestova/sitemap_warmup/security/advisories/new)
+use [private vulnerability reporting](https://github.com/clarivo-co/sitewarm/security/advisories/new)
 and say in the title that it is a Code of Conduct report.
 All complaints will be reviewed and investigated promptly and fairly.
 

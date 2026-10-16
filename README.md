@@ -3,9 +3,9 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/ernestova/sitemap_warmup/actions/workflows/ci.yml"><img src="https://github.com/ernestova/sitemap_warmup/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/ernestova/sitemap_warmup/stargazers"><img src="https://img.shields.io/github/stars/ernestova/sitemap_warmup?style=flat&amp;label=%E2%98%85&amp;color=F0602A" alt="GitHub stars" /></a>
-  <img src="https://img.shields.io/github/go-mod/go-version/ernestova/sitemap_warmup?style=flat" alt="Go version" />
+  <a href="https://github.com/clarivo-co/sitewarm/actions/workflows/ci.yml"><img src="https://github.com/clarivo-co/sitewarm/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/clarivo-co/sitewarm/stargazers"><img src="https://img.shields.io/github/stars/clarivo-co/sitewarm?style=flat&amp;label=%E2%98%85&amp;color=F0602A" alt="GitHub stars" /></a>
+  <img src="https://img.shields.io/github/go-mod/go-version/clarivo-co/sitewarm?style=flat" alt="Go version" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-F0602A?style=flat" alt="License: Apache-2.0" /></a>
   <img src="https://img.shields.io/badge/Linux%20%7C%20macOS%20%7C%20Windows-amd64%20%7C%20arm64-4493F8?style=flat" alt="Linux, macOS and Windows on amd64 and arm64" />
   <a href="https://github.com/sponsors/ernestova"><img src="https://img.shields.io/badge/sponsor-%E2%9D%A4-EA4AAA?style=flat&amp;logo=githubsponsors&amp;logoColor=white" alt="Sponsor sitewarm" /></a>
@@ -23,7 +23,7 @@
 
 > **Work in progress.** sitewarm is a Go rewrite. The original Python
 > sitemap crawler lives in [`legacy/`](legacy/) and is frozen at tag
-> [`v0-python`](https://github.com/ernestova/sitemap_warmup/tree/v0-python).
+> [`v0-python`](https://github.com/clarivo-co/sitewarm/tree/v0-python).
 
 ## Build
 
@@ -114,13 +114,13 @@ in `Vary` can make a `hit` unrepresentative of real users.
 
 ## Community & support
 
-- **Bugs and ideas:** [open an issue](https://github.com/ernestova/sitemap_warmup/issues/new/choose).
+- **Bugs and ideas:** [open an issue](https://github.com/clarivo-co/sitewarm/issues/new/choose).
   A wrong cache state has its own form.
 - **Contributing:** see [CONTRIBUTING.md](CONTRIBUTING.md).
 - **Security:** report privately, see [SECURITY.md](SECURITY.md).
 - **Sponsor:** sitewarm is free and open source. If it saves you a cold cache,
   [sponsor its development](https://github.com/sponsors/ernestova) or
-  [star the repo](https://github.com/ernestova/sitemap_warmup) to follow along.
+  [star the repo](https://github.com/clarivo-co/sitewarm) to follow along.
 
 ## License
 

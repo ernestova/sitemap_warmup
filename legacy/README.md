@@ -1,7 +1,7 @@
 # Legacy Python CLI (v0)
 
 This directory holds the original Python `sitemap_warmup` CLI, frozen at tag
-[`v0-python`](https://github.com/ernestova/sitemap_warmup/tree/v0-python).
+[`v0-python`](https://github.com/clarivo-co/sitewarm/tree/v0-python).
 It is no longer maintained; the Go rewrite (`sitewarm`) replaces it.
 
 To keep using it:
