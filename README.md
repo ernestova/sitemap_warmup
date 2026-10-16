@@ -1,15 +1,25 @@
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fernestova%2Fsitemap_warmup.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fernestova%2Fsitemap_warmup?ref=badge_shield)
+<h1 align="center">
+  <img src="docs/assets/ember.svg" alt="Ember, the sitewarm mascot: a small flame with a green check badge" width="72" valign="middle" /> sitewarm
+</h1>
 
 <p align="center">
-  <img src="docs/assets/ember.svg" width="140" alt="Ember, the sitewarm mascot: a small flame with a green check badge">
+  <a href="https://github.com/ernestova/sitemap_warmup/actions/workflows/ci.yml"><img src="https://github.com/ernestova/sitemap_warmup/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/ernestova/sitemap_warmup/stargazers"><img src="https://img.shields.io/github/stars/ernestova/sitemap_warmup?style=flat&amp;label=%E2%98%85&amp;color=F0602A" alt="GitHub stars" /></a>
+  <img src="https://img.shields.io/github/go-mod/go-version/ernestova/sitemap_warmup?style=flat" alt="Go version" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-F0602A?style=flat" alt="License: Apache-2.0" /></a>
+  <img src="https://img.shields.io/badge/Linux%20%7C%20macOS%20%7C%20Windows-amd64%20%7C%20arm64-4493F8?style=flat" alt="Linux, macOS and Windows on amd64 and arm64" />
+  <a href="https://github.com/sponsors/ernestova"><img src="https://img.shields.io/badge/sponsor-%E2%9D%A4-EA4AAA?style=flat&amp;logo=githubsponsors&amp;logoColor=white" alt="Sponsor sitewarm" /></a>
+  <a href="https://app.fossa.io/projects/git%2Bgithub.com%2Fernestova%2Fsitemap_warmup?ref=badge_shield"><img src="https://app.fossa.io/api/projects/git%2Bgithub.com%2Fernestova%2Fsitemap_warmup.svg?type=shield" alt="FOSSA status" /></a>
 </p>
 
-# sitewarm
+<p align="center">
+  <strong>Warm your top pages after a deploy, and prove the CDN serves them from cache.</strong><br/>
+  Per URL and browser profile, on Cloudflare, Vercel, CloudFront, Fastly and Akamai.
+</p>
 
-Warms your top pages through the CDN after a deploy and verifies, per URL and
-browser profile, that the CDN now serves them from cache.
-
-![sitewarm scan output: six URL and profile pairs on Cloudflare and Vercel, all hit](docs/assets/demo.png)
+<p align="center">
+  <img src="docs/assets/demo.png" alt="sitewarm scan output: six URL and profile pairs on Cloudflare and Vercel, all hit" width="960" />
+</p>
 
 > **Work in progress.** sitewarm is a Go rewrite. The original Python
 > sitemap crawler lives in [`legacy/`](legacy/) and is frozen at tag
@@ -101,6 +111,16 @@ a second Ctrl-C exits at once.
 A `hit` is verified only at the CDN PoP serving the machine that runs
 sitewarm. A cache key that depends on device or User-Agent without saying so
 in `Vary` can make a `hit` unrepresentative of real users.
+
+## Community & support
+
+- **Bugs and ideas:** [open an issue](https://github.com/ernestova/sitemap_warmup/issues/new/choose).
+  A wrong cache state has its own form.
+- **Contributing:** see [CONTRIBUTING.md](CONTRIBUTING.md).
+- **Security:** report privately, see [SECURITY.md](SECURITY.md).
+- **Sponsor:** sitewarm is free and open source. If it saves you a cold cache,
+  [sponsor its development](https://github.com/sponsors/ernestova) or
+  [star the repo](https://github.com/ernestova/sitemap_warmup) to follow along.
 
 ## License
 
