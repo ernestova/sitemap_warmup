@@ -1,11 +1,17 @@
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fernestova%2Fsitemap_warmup.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fernestova%2Fsitemap_warmup?ref=badge_shield)
 
+<p align="center">
+  <img src="docs/assets/ember.svg" width="140" alt="Ember, the sitewarm mascot: a small flame with a green check badge">
+</p>
+
 # sitewarm
 
 Warms your top pages through the CDN after a deploy and verifies, per URL and
 browser profile, that the CDN now serves them from cache.
 
-> **Work in progress.** This branch is the Go rewrite. The original Python
+![sitewarm scan output: six URL and profile pairs on Cloudflare and Vercel, all hit](docs/assets/demo.png)
+
+> **Work in progress.** sitewarm is a Go rewrite. The original Python
 > sitemap crawler lives in [`legacy/`](legacy/) and is frozen at tag
 > [`v0-python`](https://github.com/ernestova/sitemap_warmup/tree/v0-python).
 
