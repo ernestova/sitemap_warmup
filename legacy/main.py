@@ -68,13 +68,12 @@ async def bound_warms(sem, url):
 
 async def warm_it(url):
 
-    connection_started_time = None
-    connection_made_time = None
+    # Filled by the connector hooks below: 'started' and 'made' timestamps.
+    timing = {}
 
     class TimedResponseHandler(aiohttp.client_proto.ResponseHandler):
         def connection_made(self, transport):
-            nonlocal connection_made_time
-            connection_made_time = datetime.datetime.now()
+            timing['made'] = datetime.datetime.now()
             return super().connection_made(transport)
 
     class TimedTCPConnector(aiohttp.TCPConnector):
@@ -83,19 +82,18 @@ async def warm_it(url):
             self._factory = functools.partial(TimedResponseHandler, loop=loop)
 
         async def _create_connection(self, req, traces, timeout):
-            nonlocal connection_started_time
-            connection_started_time = datetime.datetime.now()
+            timing['started'] = datetime.datetime.now()
             return await super()._create_connection(req, traces, timeout)
 
     async with aiohttp.ClientSession(connector=TimedTCPConnector(loop=loop), headers=headers) as session:
         async with session.get(url) as response:
             global dot, dot_total, results
-            if connection_started_time is None or connection_made_time is None:
+            if 'started' in timing and 'made' in timing:
+                time_delta = timing['made'] - timing['started']
+                time_taken = "%s.%s" % (time_delta.seconds, time_delta.microseconds)
+            else:
                 time_delta = None
                 time_taken = "n/a"
-            else:
-                time_delta = connection_made_time - connection_started_time
-                time_taken = "%s.%s" % (time_delta.seconds, time_delta.microseconds)
 
             robots_status = ""
             cache_control = ""
