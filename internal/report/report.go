@@ -249,14 +249,25 @@ func WriteJSON(w io.Writer, r *Report) error {
 	return enc.Encode(r)
 }
 
-// WriteTable writes a human-readable summary.
+// attention lists the states that do not fail by default but are
+// highlighted because they will never become a hit.
+var attention = map[cdn.State]bool{
+	cdn.Bypass: true, cdn.Unknown: true, cdn.VariantUnverifiable: true,
+	cdn.Challenged: true, cdn.Stale: true,
+}
+
+// WriteTable writes a human-readable summary. Failed rows are marked ✗ and
+// highlighted states !.
 func WriteTable(w io.Writer, r *Report) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "STATE\tPROFILE\tURL\tCDN\tPOP\tTTFB 1st→last\tTO HIT\tINDEX\t")
 	for _, e := range r.Results {
 		mark := ""
-		if e.Failed {
+		switch {
+		case e.Failed:
 			mark = " ✗"
+		case attention[e.State]:
+			mark = " !"
 		}
 		fmt.Fprintf(tw, "%s%s\t%s\t%s\t%s\t%s\t%s→%s\t%s\t%s\t\n",
 			e.State, mark, e.Profile, e.URL, dash(e.CDN), dash(e.POP),
@@ -273,6 +284,24 @@ func WriteTable(w io.Writer, r *Report) error {
 		}
 	}
 	fmt.Fprintf(w, "%d results: %s (hit ratio %.0f%%)\n", r.Summary.Total, strings.Join(counts, " "), r.Summary.HitRatio*100)
+	var notable []string
+	for _, st := range cdn.States {
+		if n := r.Summary.ByState[st]; n > 0 && attention[st] {
+			notable = append(notable, fmt.Sprintf("%s=%d", st, n))
+		}
+	}
+	if len(notable) > 0 {
+		fmt.Fprintf(w, "attention (not failing unless in --fail-on): %s\n", strings.Join(notable, " "))
+	}
+	var stale []string
+	for _, e := range r.Results {
+		if e.State == cdn.Stale {
+			stale = append(stale, e.URL+" ("+e.Profile+")")
+		}
+	}
+	if len(stale) > 0 {
+		fmt.Fprintf(w, "stale after --max-wait: %s\n", strings.Join(stale, ", "))
+	}
 	if r.Stopped != "" {
 		fmt.Fprintf(w, "stopped early: %s\n", r.Stopped)
 	}
