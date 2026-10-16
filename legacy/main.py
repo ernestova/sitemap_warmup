@@ -90,8 +90,12 @@ async def warm_it(url):
     async with aiohttp.ClientSession(connector=TimedTCPConnector(loop=loop), headers=headers) as session:
         async with session.get(url) as response:
             global dot, dot_total, results
-            time_delta = connection_made_time - connection_started_time
-            time_taken = "%s.%s" % (time_delta.seconds, time_delta.microseconds)
+            if connection_started_time is None or connection_made_time is None:
+                time_delta = None
+                time_taken = "n/a"
+            else:
+                time_delta = connection_made_time - connection_started_time
+                time_taken = "%s.%s" % (time_delta.seconds, time_delta.microseconds)
 
             robots_status = ""
             cache_control = ""
@@ -100,7 +104,8 @@ async def warm_it(url):
                 response_output = red + str(response.status) + no_color
             else:
                 response_output = green + str(response.status) + no_color
-                time_array.append(time_delta)
+                if time_delta is not None:
+                    time_array.append(time_delta)
                 doc = html.fromstring(await response.text())
                 robots = doc.xpath("//meta[@name='robots']/@content")
 
@@ -139,7 +144,7 @@ async def warm_it(url):
 
                 print(dor, end='', flush=True)
 
-            del doc, robots, response
+            del response
 
 
 def write_list_to_csv(current_sites, headers, results):
@@ -147,7 +152,10 @@ def write_list_to_csv(current_sites, headers, results):
     url_file = os.path.basename(a.path)
     filename = url_file.split('.')
 
-    results.to_csv('/tmp/%s.csv' % filename[0], encoding='utf-8', index=False)
+    # Written to the working directory, not a shared one like /tmp.
+    csv_path = os.path.join(os.getcwd(), '%s.csv' % filename[0])
+    results.to_csv(csv_path, encoding='utf-8', index=False)
+    print("CSV written to %s" % csv_path)
 
 
 def main():
@@ -183,7 +191,10 @@ def main():
                     else:
                         failed_links += 1
 
-            avg_time = str((sum([x.total_seconds() for x in time_array]))/len(time_array))
+            if time_array:
+                avg_time = str((sum([x.total_seconds() for x in time_array]))/len(time_array))
+            else:
+                avg_time = "n/a"
 
             print("\n")
             print("Meta Robots: I = index, IF=index/follow, F=noindex, NA = Not Found")
