@@ -1,0 +1,68 @@
+name: Wrong cache state
+description: A URL was reported with a state that does not match what the CDN did
+labels: [cdn, needs triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        sitewarm decides the state from the response headers, so the raw
+        headers are what lets us fix the mapping. Remove cookies, tokens and
+        anything private before pasting.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `sitewarm --version`
+    validations:
+      required: true
+  - type: dropdown
+    id: cdn
+    attributes:
+      label: CDN
+      description: The CDN closest to the visitor, if several are stacked
+      options:
+        - Cloudflare
+        - Vercel
+        - CloudFront
+        - Fastly
+        - Akamai
+        - Other (say below)
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: reported
+    attributes:
+      label: State reported by sitewarm
+      placeholder: unknown
+    validations:
+      required: true
+  - type: input
+    id: expected
+    attributes:
+      label: State you expected
+      placeholder: hit
+    validations:
+      required: true
+  - type: textarea
+    id: headers
+    attributes:
+      label: Raw response headers
+      description: |
+        For example from `curl -sI https://example.com/page`. Include the
+        cache headers (`cf-cache-status`, `x-cache`, `x-vercel-cache`, `age`,
+        `cache-control`, `vary`, `via`, `server`). Redact `set-cookie` values.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Report entry
+      description: The result for this URL from the `--report` JSON
+      render: json
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: CDN configuration that matters, such as cache rules or a custom cache key
