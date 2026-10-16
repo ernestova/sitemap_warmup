@@ -12,11 +12,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/ernestova/sitemap_warmup/internal/cdn"
-	"github.com/ernestova/sitemap_warmup/internal/probe"
-	"github.com/ernestova/sitemap_warmup/internal/report"
-	"github.com/ernestova/sitemap_warmup/internal/source"
-	"github.com/ernestova/sitemap_warmup/internal/verify"
+	"github.com/clarivo-co/sitewarm/internal/cdn"
+	"github.com/clarivo-co/sitewarm/internal/probe"
+	"github.com/clarivo-co/sitewarm/internal/report"
+	"github.com/clarivo-co/sitewarm/internal/source"
+	"github.com/clarivo-co/sitewarm/internal/verify"
 )
 
 // Version is set at build time.

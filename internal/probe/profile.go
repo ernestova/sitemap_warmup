@@ -13,7 +13,7 @@ const ChromeMajor = "155"
 const DefaultAcceptLanguage = "en-US,en;q=0.9"
 
 // RepoURL identifies the tool in the User-Agent token.
-const RepoURL = "https://github.com/ernestova/sitemap_warmup"
+const RepoURL = "https://github.com/clarivo-co/sitewarm"
 
 // Profile is one way of requesting a URL: GET plus a fixed set of headers.
 type Profile struct {

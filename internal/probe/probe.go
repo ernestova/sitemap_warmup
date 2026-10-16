@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ernestova/sitemap_warmup/internal/cdn"
+	"github.com/clarivo-co/sitewarm/internal/cdn"
 )
 
 // DefaultRequestTimeout is the deadline for each request, body included.

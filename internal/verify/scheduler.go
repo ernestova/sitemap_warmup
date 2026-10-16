@@ -5,8 +5,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/ernestova/sitemap_warmup/internal/cdn"
-	"github.com/ernestova/sitemap_warmup/internal/probe"
+	"github.com/clarivo-co/sitewarm/internal/cdn"
+	"github.com/clarivo-co/sitewarm/internal/probe"
 )
 
 // Config holds the scheduling limits. Zero values are not defaults; callers

@@ -8,7 +8,7 @@ welcome.
 - For anything larger than a small fix, open an issue first so we can agree on
   the approach before you write code.
 - Security problems go to
-  [private vulnerability reporting](https://github.com/ernestova/sitemap_warmup/security/advisories/new),
+  [private vulnerability reporting](https://github.com/clarivo-co/sitewarm/security/advisories/new),
   not to issues. See [SECURITY.md](SECURITY.md).
 - By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
 

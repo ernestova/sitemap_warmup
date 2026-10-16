@@ -1,4 +1,4 @@
-module github.com/ernestova/sitemap_warmup
+module github.com/clarivo-co/sitewarm
 
 go 1.26.0
 
