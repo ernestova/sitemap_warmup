@@ -1,0 +1,65 @@
+name: Bug report
+description: sitewarm crashes, hangs or behaves differently from the docs
+labels: [bug, needs triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. If a URL got the wrong cache state (for example
+        `unknown` or `miss` when the CDN served a hit), use the
+        **Wrong cache state** form instead.
+
+        Do not paste cookies, tokens or private hostnames. Security issues go to
+        [private vulnerability reporting](https://github.com/ernestova/sitemap_warmup/security/advisories/new).
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `sitewarm --version`
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS / architecture
+      options:
+        - Linux amd64
+        - Linux arm64
+        - macOS arm64 (Apple silicon)
+        - macOS amd64
+        - Windows amd64
+        - Windows arm64
+        - Other (say below)
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: The exact command, with secrets removed
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened, including the exit code and any error output
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Report
+      description: The relevant part of the `--report` JSON, if there is one
+      render: json
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
