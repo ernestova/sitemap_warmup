@@ -198,6 +198,7 @@ func TestSchedulerRunTimeoutMarksIncomplete(t *testing.T) {
 func TestSchedulerCancelMarksIncomplete(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		go func() {
 			time.Sleep(3 * time.Second)
 			cancel()
