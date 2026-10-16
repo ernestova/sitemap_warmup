@@ -341,3 +341,37 @@ func TestCookiesNeverOverHTTPAfterRedirect(t *testing.T) {
 		t.Fatalf("cookie sent over http: %q", plainCookie.Load())
 	}
 }
+
+func TestXRobotsTagScopes(t *testing.T) {
+	for _, tc := range []struct {
+		values []string
+		want   bool
+	}{
+		{[]string{"noindex"}, true},
+		{[]string{"none"}, true},
+		{[]string{"googlebot: noindex"}, true},
+		{[]string{"otherbot: noindex"}, false},
+		{[]string{"otherbot: noindex, nofollow"}, false},
+		{[]string{"otherbot: nofollow", "noindex"}, true},
+		{[]string{"otherbot: noindex", "googlebot: nofollow"}, false},
+		{[]string{"googlebot: nofollow, otherbot: noindex"}, false},
+		{[]string{"otherbot: nofollow, googlebot: noindex"}, true},
+		{[]string{"unavailable_after: 25 Jun 2030 15:00:00 PST, noindex"}, true},
+		{[]string{"max-snippet: 20, nofollow"}, false},
+	} {
+		if got := xRobotsNoIndex(tc.values); got != tc.want {
+			t.Errorf("xRobotsNoIndex(%q) = %v, want %v", tc.values, got, tc.want)
+		}
+	}
+}
+
+func TestXRobotsTagOtherBotIsIndexable(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/pdf")
+		w.Header().Set("X-Robots-Tag", "otherbot: noindex")
+	}))
+	defer srv.Close()
+	if obs := newProber(t, Config{}).Do(context.Background(), srv.URL, desktop); obs.Indexability != NotHTML {
+		t.Fatalf("indexability = %s, want not-html (no noindex for general crawlers)", obs.Indexability)
+	}
+}

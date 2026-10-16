@@ -76,7 +76,7 @@ func readBody(resp *http.Response, analyze bool) bodyResult {
 }
 
 func indexability(resp *http.Response, body io.Reader) (Indexability, string) {
-	if tag := resp.Header.Values("X-Robots-Tag"); hasNoIndex(strings.Join(tag, ",")) {
+	if tag := resp.Header.Values("X-Robots-Tag"); xRobotsNoIndex(tag) {
 		return NoIndex, "X-Robots-Tag: " + strings.Join(tag, ", ")
 	}
 	mediaType, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
@@ -197,16 +197,41 @@ func scanHead(buf []byte) (Indexability, string) {
 	}
 }
 
-// hasNoIndex reports whether a robots directive list contains noindex or
-// none. X-Robots-Tag values may be prefixed with a user-agent ("bot: noindex").
+// hasNoIndex reports whether a meta robots directive list contains noindex
+// or none.
 func hasNoIndex(directives string) bool {
 	for _, d := range strings.Split(directives, ",") {
-		d = strings.ToLower(strings.TrimSpace(d))
-		if _, after, ok := strings.Cut(d, ":"); ok {
-			d = strings.TrimSpace(after)
-		}
-		if d == "noindex" || d == "none" {
+		if isNoIndex(strings.ToLower(strings.TrimSpace(d))) {
 			return true
+		}
+	}
+	return false
+}
+
+func isNoIndex(d string) bool { return d == "noindex" || d == "none" }
+
+// valued are the robots directives written as "name: value", which must not
+// be read as a user-agent prefix.
+var valued = map[string]bool{
+	"unavailable_after": true, "max-snippet": true,
+	"max-image-preview": true, "max-video-preview": true,
+}
+
+// xRobotsNoIndex reports whether X-Robots-Tag headers carry noindex for all
+// crawlers or for Googlebot, the same scope as the meta check. Each header
+// is read on its own; a "bot:" prefix scopes the directives after it, so
+// "otherbot: noindex" does not count.
+func xRobotsNoIndex(values []string) bool {
+	for _, v := range values {
+		scope := ""
+		for _, d := range strings.Split(v, ",") {
+			d = strings.ToLower(strings.TrimSpace(d))
+			if name, after, ok := strings.Cut(d, ":"); ok && !valued[strings.TrimSpace(name)] {
+				scope, d = strings.TrimSpace(name), strings.TrimSpace(after)
+			}
+			if (scope == "" || scope == "googlebot") && isNoIndex(d) {
+				return true
+			}
 		}
 	}
 	return false

@@ -165,9 +165,27 @@ func Run(ctx context.Context, cfg Config, pairs []Pair, do ProbeFunc) (out []Out
 		seq++
 	}
 
+	// expire finishes, with their last verdict, the retries whose MaxWait ran
+	// out while they waited behind first attempts or the rate limiter.
+	expire := func(now time.Time) {
+		kept := retries[:0]
+		for _, it := range retries {
+			if now.Sub(out[it.idx].First.Start) > cfg.MaxWait {
+				finish(it.idx, out[it.idx].Verdict)
+				continue
+			}
+			kept = append(kept, it)
+		}
+		if len(kept) != len(retries) {
+			retries = kept
+			heap.Init(&retries)
+		}
+	}
+
 	// next returns the pair to request now, if any is eligible, and
 	// otherwise when the next one becomes eligible.
 	next := func(now time.Time) (idx int, ok bool, wake time.Time, waiting bool) {
+		expire(now)
 		var due time.Time
 		switch {
 		case first < len(pairs):
@@ -212,6 +230,9 @@ loop:
 			}
 			inflight++
 			work <- idx
+		}
+		if finished == len(pairs) {
+			break // the last pairs expired in the queue
 		}
 		var timerC <-chan time.Time
 		if waiting {

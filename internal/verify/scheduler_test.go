@@ -215,3 +215,40 @@ func TestSchedulerCancelMarksIncomplete(t *testing.T) {
 		}
 	})
 }
+
+// A retry held back by first attempts past --max-wait is not sent: the pair
+// ends with its last verdict and no request starts after the window.
+func TestSchedulerMaxWaitBoundsQueuedRetries(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		cfg := defaults
+		cfg.Concurrency = 1
+		cfg.RPS = 1
+		cfg.RetryInterval = time.Second
+		cfg.MaxWait = 3 * time.Second
+		var mu sync.Mutex
+		starts := map[string][]time.Time{}
+		out, stopped := Run(context.Background(), cfg, pairs(20), func(ctx context.Context, p Pair) probe.Observation {
+			mu.Lock()
+			starts[p.URL] = append(starts[p.URL], time.Now())
+			mu.Unlock()
+			return respond("MISS")
+		})
+		if stopped != nil {
+			t.Fatalf("stopped = %v", stopped)
+		}
+		for _, o := range out {
+			if o.State != cdn.Miss {
+				t.Fatalf("%s = %s, want miss", o.URL, o.State)
+			}
+			s := starts[o.URL]
+			if last := s[len(s)-1].Sub(s[0]); last > cfg.MaxWait {
+				t.Fatalf("%s retried %v after its first attempt, max-wait %v", o.URL, last, cfg.MaxWait)
+			}
+		}
+		// 20 first attempts at 1 rps take 19 s, so pair 0's retry expired in
+		// the queue.
+		if n := out[0].Attempts; n != 1 {
+			t.Fatalf("pair 0 had %d attempts, want 1", n)
+		}
+	})
+}
