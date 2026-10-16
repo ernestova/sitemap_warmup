@@ -1,0 +1,298 @@
+// Package report builds the scan report and decides which results fail.
+package report
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"strings"
+	"text/tabwriter"
+	"time"
+
+	"github.com/ernestova/sitemap_warmup/internal/cdn"
+	"github.com/ernestova/sitemap_warmup/internal/probe"
+	"github.com/ernestova/sitemap_warmup/internal/verify"
+)
+
+// Tokens accepted by --fail-on besides the cache states.
+const (
+	NoIndex      = "noindex"
+	Inconclusive = string(probe.IndexabilityInconclusive)
+)
+
+// DefaultFailOn is the documented --fail-on default.
+const DefaultFailOn = "miss,client-error,error,incomplete,noindex,redirect-error"
+
+// FailOn is the set of states (plus noindex tokens) that fail a run.
+type FailOn map[string]bool
+
+// ParseFailOn parses a comma-separated --fail-on value. An empty value
+// fails on nothing.
+func ParseFailOn(s string) (FailOn, error) {
+	valid := map[string]bool{NoIndex: true, Inconclusive: true}
+	for _, st := range cdn.States {
+		if st != cdn.Hit {
+			valid[string(st)] = true
+		}
+	}
+	f := FailOn{}
+	for _, tok := range strings.Split(s, ",") {
+		tok = strings.ToLower(strings.TrimSpace(tok))
+		if tok == "" {
+			continue
+		}
+		if !valid[tok] {
+			return nil, fmt.Errorf("--fail-on: unknown value %q (valid: %s)", tok, strings.Join(validList(), ", "))
+		}
+		f[tok] = true
+	}
+	return f, nil
+}
+
+func validList() []string {
+	var out []string
+	for _, st := range cdn.States {
+		if st != cdn.Hit {
+			out = append(out, string(st))
+		}
+	}
+	return append(out, NoIndex, Inconclusive)
+}
+
+// List returns the tokens in a stable order.
+func (f FailOn) List() []string {
+	var out []string
+	for _, tok := range validList() {
+		if f[tok] {
+			out = append(out, tok)
+		}
+	}
+	return out
+}
+
+// Fails reports whether a result fails the run. indexability-error fails
+// with noindex: an unreadable body cannot prove the page is indexable.
+func (f FailOn) Fails(state cdn.State, idx probe.Indexability) bool {
+	switch {
+	case f[string(state)]:
+		return true
+	case f[NoIndex] && (idx == probe.NoIndex || idx == probe.IndexabilityError):
+		return true
+	case f[Inconclusive] && idx == probe.IndexabilityInconclusive:
+		return true
+	}
+	return false
+}
+
+// Entry is the report line for one URL and profile.
+type Entry struct {
+	URL          string          `json:"url"`
+	Profile      string          `json:"profile"`
+	FinalURL     string          `json:"final_url,omitempty"`
+	Redirects    []probe.Hop     `json:"redirects,omitempty"`
+	InitialState cdn.State       `json:"initial_state,omitempty"`
+	State        cdn.State       `json:"state"`
+	Failed       bool            `json:"failed"`
+	Attempts     int             `json:"attempts"`
+	HTTPStatus   int             `json:"http_status,omitempty"`
+	CDN          string          `json:"cdn,omitempty"`
+	CacheStatus  string          `json:"cache_status_raw,omitempty"`
+	POP          string          `json:"pop,omitempty"`
+	OtherCDNs    []cdn.Detection `json:"other_cdns,omitempty"`
+	TTFBFirstMS  *int64          `json:"ttfb_first_ms"`
+	TTFBFinalMS  *int64          `json:"ttfb_final_ms"`
+	TimeToHitMS  *int64          `json:"time_to_hit_ms"`
+	CacheControl string          `json:"cache_control,omitempty"`
+	Age          string          `json:"age,omitempty"`
+	Vary         string          `json:"vary,omitempty"`
+	// SetCookie records only whether the header was present; its value is
+	// never reported.
+	SetCookie          bool               `json:"set_cookie"`
+	Indexability       probe.Indexability `json:"indexability,omitempty"`
+	IndexabilityDetail string             `json:"indexability_detail,omitempty"`
+	Detail             string             `json:"detail,omitempty"`
+	Warnings           []string           `json:"warnings,omitempty"`
+}
+
+// Summary aggregates the entries.
+type Summary struct {
+	Total    int               `json:"total"`
+	ByState  map[cdn.State]int `json:"by_state"`
+	HitRatio float64           `json:"hit_ratio"`
+	Failed   int               `json:"failed"`
+	Passed   bool              `json:"passed"`
+	Verdict  string            `json:"verdict"`
+}
+
+// Settings echoes the options the run used.
+type Settings struct {
+	Source        string   `json:"source"`
+	Top           int      `json:"top"`
+	Profiles      []string `json:"profiles"`
+	Concurrency   int      `json:"concurrency"`
+	RPS           float64  `json:"rps"`
+	RetryInterval string   `json:"retry_interval"`
+	MaxWait       string   `json:"max_wait"`
+	RunTimeout    string   `json:"run_timeout"`
+	FailOn        []string `json:"fail_on"`
+}
+
+// Report is the scan result.
+type Report struct {
+	Tool       string    `json:"tool"`
+	Version    string    `json:"version"`
+	StartedAt  time.Time `json:"started_at"`
+	FinishedAt time.Time `json:"finished_at"`
+	DurationMS int64     `json:"duration_ms"`
+	// Stopped is set when the run ended early: run-timeout, SIGINT, SIGTERM
+	// or canceled. Unfinished results are incomplete.
+	Stopped  string   `json:"stopped,omitempty"`
+	Settings Settings `json:"settings"`
+	Summary  Summary  `json:"summary"`
+	Warnings []string `json:"warnings"`
+	Results  []Entry  `json:"results"`
+}
+
+// Standing limitations, printed on every report.
+const (
+	WarnSinglePoP = "verified only at the CDN PoP serving this machine; other PoPs were not checked"
+	WarnVariants  = "a cache key that depends on device or User-Agent without saying so in Vary can make a hit unrepresentative of real users"
+	verdictPass   = "cache verified; deploy freshness not verified"
+)
+
+// Build assembles the report from the scheduler outcomes.
+func Build(r *Report, outcomes []verify.Outcome, failOn FailOn) {
+	r.Tool = "sitewarm"
+	r.Settings.FailOn = failOn.List()
+	r.DurationMS = r.FinishedAt.Sub(r.StartedAt).Milliseconds()
+	r.Warnings = []string{WarnSinglePoP, WarnVariants}
+	s := Summary{ByState: map[cdn.State]int{}}
+	r.Results = make([]Entry, 0, len(outcomes))
+	for _, o := range outcomes {
+		e := entry(o)
+		e.Failed = failOn.Fails(e.State, e.Indexability)
+		s.Total++
+		s.ByState[e.State]++
+		if e.Failed {
+			s.Failed++
+		}
+		r.Results = append(r.Results, e)
+	}
+	if s.Total > 0 {
+		s.HitRatio = float64(s.ByState[cdn.Hit]) / float64(s.Total)
+	}
+	s.Passed = s.Failed == 0
+	if s.Passed {
+		s.Verdict = verdictPass
+	} else {
+		s.Verdict = fmt.Sprintf("failed: %d of %d results are in --fail-on", s.Failed, s.Total)
+	}
+	r.Summary = s
+}
+
+func ms(d time.Duration) *int64 {
+	v := d.Milliseconds()
+	return &v
+}
+
+func entry(o verify.Outcome) Entry {
+	e := Entry{
+		URL:          o.URL,
+		Profile:      o.Profile.Name,
+		InitialState: o.InitialState,
+		State:        o.State,
+		Attempts:     o.Attempts,
+		Detail:       o.Verdict.Detail,
+	}
+	if o.First != nil && o.First.HasTTFB {
+		e.TTFBFirstMS = ms(o.First.TTFB)
+	}
+	if o.GotHit {
+		e.TimeToHitMS = ms(o.TimeToHit)
+	}
+	last := o.Last
+	if last == nil {
+		return e
+	}
+	if last.HasTTFB {
+		e.TTFBFinalMS = ms(last.TTFB)
+	}
+	e.FinalURL = last.FinalURL
+	e.Redirects = last.Redirects
+	e.HTTPStatus = last.Status
+	e.CDN = o.Verdict.CDN.CDN
+	e.CacheStatus = o.Verdict.CDN.Raw
+	e.POP = o.Verdict.CDN.POP
+	e.OtherCDNs = o.Verdict.CDN.Others
+	if h := last.Header; h != nil {
+		e.CacheControl = strings.Join(h.Values("Cache-Control"), ", ")
+		e.Age = h.Get("Age")
+		e.Vary = strings.Join(h.Values("Vary"), ", ")
+		e.SetCookie = len(h.Values("Set-Cookie")) > 0
+	}
+	e.Indexability = last.Indexability
+	e.IndexabilityDetail = last.IndexabilityDetail
+	if len(last.Redirects) > 0 && last.RedirectError == "" {
+		e.Warnings = append(e.Warnings, fmt.Sprintf("redirected: %s → %s", last.URL, last.FinalURL))
+	}
+	if e.Indexability == probe.IndexabilityInconclusive {
+		e.Warnings = append(e.Warnings, "indexability inconclusive: "+e.IndexabilityDetail)
+	}
+	return e
+}
+
+// WriteJSON writes the report as indented JSON.
+func WriteJSON(w io.Writer, r *Report) error {
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	enc.SetEscapeHTML(false)
+	return enc.Encode(r)
+}
+
+// WriteTable writes a human-readable summary.
+func WriteTable(w io.Writer, r *Report) error {
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "STATE\tPROFILE\tURL\tCDN\tPOP\tTTFB 1st→last\tTO HIT\tINDEX\t")
+	for _, e := range r.Results {
+		mark := ""
+		if e.Failed {
+			mark = " ✗"
+		}
+		fmt.Fprintf(tw, "%s%s\t%s\t%s\t%s\t%s\t%s→%s\t%s\t%s\t\n",
+			e.State, mark, e.Profile, e.URL, dash(e.CDN), dash(e.POP),
+			msText(e.TTFBFirstMS), msText(e.TTFBFinalMS), msText(e.TimeToHitMS), dash(string(e.Indexability)))
+	}
+	if err := tw.Flush(); err != nil {
+		return err
+	}
+	fmt.Fprintln(w)
+	var counts []string
+	for _, st := range cdn.States {
+		if n := r.Summary.ByState[st]; n > 0 {
+			counts = append(counts, fmt.Sprintf("%s=%d", st, n))
+		}
+	}
+	fmt.Fprintf(w, "%d results: %s (hit ratio %.0f%%)\n", r.Summary.Total, strings.Join(counts, " "), r.Summary.HitRatio*100)
+	if r.Stopped != "" {
+		fmt.Fprintf(w, "stopped early: %s\n", r.Stopped)
+	}
+	for _, warn := range r.Warnings {
+		fmt.Fprintf(w, "note: %s\n", warn)
+	}
+	_, err := fmt.Fprintln(w, r.Summary.Verdict)
+	return err
+}
+
+func dash(s string) string {
+	if s == "" {
+		return "-"
+	}
+	return s
+}
+
+func msText(v *int64) string {
+	if v == nil {
+		return "-"
+	}
+	return fmt.Sprintf("%dms", *v)
+}
