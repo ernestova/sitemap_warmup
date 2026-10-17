@@ -22,12 +22,15 @@ const (
 	Incomplete          State = "incomplete"
 	Unknown             State = "unknown"
 	RedirectError       State = "redirect-error"
+	// SkippedRobots is a sitemap URL that robots.txt disallows, or whose
+	// robots.txt could not be read. It is never requested.
+	SkippedRobots State = "skipped-robots"
 )
 
 // States lists every normalized state, in report order.
 var States = []State{
 	Hit, Stale, Miss, Bypass, VariantUnverifiable, Challenged,
-	ClientError, Error, RedirectError, Incomplete, Unknown,
+	ClientError, Error, RedirectError, Incomplete, Unknown, SkippedRobots,
 }
 
 // CDN names.

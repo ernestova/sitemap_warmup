@@ -38,6 +38,7 @@ const (
 	RedirectError       = cdn.RedirectError
 	Incomplete          = cdn.Incomplete
 	Unknown             = cdn.Unknown
+	SkippedRobots       = cdn.SkippedRobots
 )
 
 // Result is the scan report.
@@ -58,6 +59,10 @@ const (
 type Options struct {
 	// TopFrom is the path of the CSV with the URLs, in priority order.
 	TopFrom string
+	// FromSitemap is the URL of a sitemap or sitemap index. It excludes
+	// TopFrom. Its URLs are checked against robots.txt unless IgnoreRobots.
+	FromSitemap  string
+	IgnoreRobots bool
 	// BaseURL resolves a CSV "path" column.
 	BaseURL string
 	// Top keeps the first N URLs of the list.
@@ -116,25 +121,53 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 	if err != nil {
 		return nil, configErr(err)
 	}
-	if opts.TopFrom == "" {
-		return nil, configErr(errors.New("no URL source: use --top-from <file.csv>"))
+	if (opts.TopFrom == "") == (opts.FromSitemap == "") {
+		return nil, configErr(ErrSource)
 	}
-	f, err := os.Open(opts.TopFrom)
+	profiles, err := selectProfiles(opts)
 	if err != nil {
 		return nil, configErr(err)
 	}
-	urls, err := source.ReadCSV(f, opts.BaseURL)
-	f.Close()
-	if err != nil {
-		return nil, configErr(fmt.Errorf("%s: %w", opts.TopFrom, err))
+	fetcher := source.Fetcher{
+		Client:    sourceClient(opts),
+		UserAgent: profiles[0].Header.Get("User-Agent"),
+	}
+
+	var urls []string
+	src := opts.TopFrom
+	if opts.TopFrom != "" {
+		f, err := os.Open(opts.TopFrom)
+		if err != nil {
+			return nil, configErr(err)
+		}
+		urls, err = source.ReadCSV(f, opts.BaseURL)
+		f.Close()
+		if err != nil {
+			return nil, configErr(fmt.Errorf("%s: %w", opts.TopFrom, err))
+		}
+	} else {
+		src = opts.FromSitemap
+		if urls, err = fetcher.ReadSitemap(ctx, opts.FromSitemap, opts.Top); err != nil {
+			return nil, configErr(err)
+		}
 	}
 	if opts.Top > 0 && len(urls) > opts.Top {
 		urls = urls[:opts.Top]
 	}
 
-	profiles, err := selectProfiles(opts)
-	if err != nil {
-		return nil, configErr(err)
+	// robots.txt is consulted only for sitemap URLs: a --top-from list is
+	// chosen explicitly by its operator.
+	skip := map[string]bool{}
+	var sourceWarnings []string
+	if opts.FromSitemap != "" && !opts.IgnoreRobots {
+		robots := fetcher.NewRobots()
+		for _, u := range urls {
+			ok, err := robots.Allowed(ctx, u)
+			if err != nil || !ok {
+				skip[u] = true
+			}
+		}
+		sourceWarnings = robots.Warnings()
 	}
 	prober, err := probe.New(probe.Config{
 		CookieHosts:    opts.CookieHosts,
@@ -145,18 +178,25 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 		return nil, configErr(err)
 	}
 
-	pairs := make([]verify.Pair, 0, len(urls)*len(profiles))
+	// all keeps the list order; only the pairs not skipped are requested.
+	all := make([]verify.Pair, 0, len(urls)*len(profiles))
+	var pairs []verify.Pair
 	for _, u := range urls {
 		for _, p := range profiles {
-			pairs = append(pairs, verify.Pair{URL: u, Profile: p})
+			all = append(all, verify.Pair{URL: u, Profile: p})
+			if !skip[u] {
+				pairs = append(pairs, verify.Pair{URL: u, Profile: p})
+			}
 		}
 	}
 
 	res := &Result{
 		Version:   Version,
 		StartedAt: time.Now(),
+		Warnings:  sourceWarnings,
 		Settings: report.Settings{
-			Source:        opts.TopFrom,
+			Source:        src,
+			IgnoreRobots:  opts.FromSitemap != "" && opts.IgnoreRobots,
 			Top:           opts.Top,
 			Concurrency:   opts.Concurrency,
 			RPS:           opts.RPS,
@@ -186,8 +226,35 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 	default:
 		res.Stopped = "canceled"
 	}
-	report.Build(res, outcomes, failOn)
+	merged := make([]verify.Outcome, 0, len(all))
+	next := 0
+	for _, p := range all {
+		if skip[p.URL] {
+			merged = append(merged, report.SkippedOutcome(p))
+			continue
+		}
+		merged = append(merged, outcomes[next])
+		next++
+	}
+	report.Build(res, merged, failOn)
 	return res, nil
+}
+
+// ErrSource means zero or several URL sources were given.
+var ErrSource = errors.New("choose exactly one URL source: --top-from <file.csv> or --from-sitemap <url>")
+
+// sourceClient fetches sitemaps and robots.txt. Unlike the probe, it lets
+// Go decode Content-Encoding gzip.
+func sourceClient(opts Options) *http.Client {
+	timeout := opts.RequestTimeout
+	if timeout == 0 {
+		timeout = probe.DefaultRequestTimeout
+	}
+	transport := opts.Transport
+	if transport == nil {
+		transport = http.DefaultTransport.(*http.Transport).Clone()
+	}
+	return &http.Client{Transport: transport, Timeout: timeout}
 }
 
 func selectProfiles(opts Options) ([]probe.Profile, error) {

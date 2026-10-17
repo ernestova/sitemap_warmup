@@ -148,6 +148,7 @@ func TestExitCodes(t *testing.T) {
 		{"bad flag", []string{"scan", "--nope"}, 2},
 		{"bad fail-on", []string{"scan", "--top-from", csvFor(t, hit.URL+"/"), "--fail-on", "nope"}, 2},
 		{"bad format", []string{"scan", "--top-from", csvFor(t, hit.URL+"/"), "--format", "xml"}, 2},
+		{"two sources", []string{"scan", "--top-from", csvFor(t, hit.URL+"/"), "--from-sitemap", hit.URL + "/sitemap.xml"}, 2},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
