@@ -43,4 +43,22 @@ headers (redacted) for every cache status you map. Unmapped values must stay
 4. A maintainer reviews it. PRs are squash-merged, so the PR title becomes the
    commit message: write it as a short imperative sentence.
 
+## Releasing (maintainers)
+
+Releases are cut from `master` by pushing a version tag such as `v1.2.3` or
+`v1.2.3-rc.1`. The `release` workflow runs the tests and then
+[GoReleaser](https://goreleaser.com) (`.goreleaser.yaml`), which builds
+linux, darwin and windows for amd64 and arm64, packs them as `.tar.gz`
+(`.zip` on Windows) with `checksums.txt` (SHA-256), and publishes a GitHub
+release. A tag with a suffix after the patch number is published as a
+pre-release. The version in the tag is embedded in `sitewarm --version` and
+the User-Agent. Version tags are never moved or reused.
+
+Check the config locally before changing it:
+
+```
+goreleaser check
+goreleaser release --snapshot --clean --skip=publish
+```
+
 Contributions are licensed under [Apache-2.0](LICENSE).

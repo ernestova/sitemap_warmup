@@ -1,0 +1,47 @@
+# GoReleaser config for tagged releases. Run by .github/workflows/release.yml.
+# Check locally with: goreleaser check && goreleaser release --snapshot --clean
+version: 2
+
+project_name: sitewarm
+
+builds:
+  - id: sitewarm
+    main: ./cmd/sitewarm
+    binary: sitewarm
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    # arm64 covers Apple silicon, Windows on ARM and Linux on AWS Graviton.
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X github.com/clarivo-co/sitewarm/pkg/sitewarm.Version={{ .Version }}
+    # Reproducible builds: file times come from the tagged commit.
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: sitewarm
+    ids: [sitewarm]
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^Bump "
+
+release:
+  # Tags with a pre-release suffix (v1.2.3-rc.1) are published as pre-releases.
+  prerelease: auto
