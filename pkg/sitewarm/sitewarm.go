@@ -128,13 +128,44 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 	if err != nil {
 		return nil, configErr(err)
 	}
+	prober, err := probe.New(probe.Config{
+		CookieHosts:    opts.CookieHosts,
+		RequestTimeout: opts.RequestTimeout,
+		Transport:      opts.Transport,
+	}, profiles)
+	if err != nil {
+		return nil, configErr(err)
+	}
+
+	res := &Result{
+		Version:   Version,
+		StartedAt: time.Now(),
+		Settings: report.Settings{
+			Source:        opts.TopFrom,
+			IgnoreRobots:  opts.FromSitemap != "" && opts.IgnoreRobots,
+			Top:           opts.Top,
+			Concurrency:   opts.Concurrency,
+			RPS:           opts.RPS,
+			RetryInterval: opts.RetryInterval.String(),
+			MaxWait:       opts.MaxWait.String(),
+			RunTimeout:    opts.RunTimeout.String(),
+		},
+	}
+	for _, p := range profiles {
+		res.Settings.Profiles = append(res.Settings.Profiles, p.Name)
+	}
+
+	// --run-timeout covers the whole run: reading the sitemap and robots.txt
+	// as well as warming and verifying.
+	runCtx, cancel := context.WithTimeout(ctx, opts.RunTimeout)
+	defer cancel()
 	fetcher := source.Fetcher{
 		Client:    sourceClient(opts),
 		UserAgent: profiles[0].Header.Get("User-Agent"),
 	}
 
 	var urls []string
-	src := opts.TopFrom
+	var stopped error
 	if opts.TopFrom != "" {
 		f, err := os.Open(opts.TopFrom)
 		if err != nil {
@@ -146,8 +177,14 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 			return nil, configErr(fmt.Errorf("%s: %w", opts.TopFrom, err))
 		}
 	} else {
-		src = opts.FromSitemap
-		if urls, err = fetcher.ReadSitemap(ctx, opts.FromSitemap, opts.Top); err != nil {
+		res.Settings.Source = opts.FromSitemap
+		urls, err = fetcher.ReadSitemap(runCtx, opts.FromSitemap, opts.Top)
+		switch {
+		case err != nil && runCtx.Err() != nil:
+			// Interrupted or timed out while reading: an empty report that
+			// fails, not a configuration error.
+			urls, stopped = nil, runCtx.Err()
+		case err != nil:
 			return nil, configErr(err)
 		}
 	}
@@ -158,24 +195,20 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 	// robots.txt is consulted only for sitemap URLs: a --top-from list is
 	// chosen explicitly by its operator.
 	skip := map[string]bool{}
-	var sourceWarnings []string
 	if opts.FromSitemap != "" && !opts.IgnoreRobots {
 		robots := fetcher.NewRobots()
 		for _, u := range urls {
-			ok, err := robots.Allowed(ctx, u)
+			ok, err := robots.Allowed(runCtx, u)
+			if runCtx.Err() != nil {
+				// Interrupted: the URLs not checked yet are not skipped;
+				// the scheduler reports them incomplete.
+				break
+			}
 			if err != nil || !ok {
 				skip[u] = true
 			}
 		}
-		sourceWarnings = robots.Warnings()
-	}
-	prober, err := probe.New(probe.Config{
-		CookieHosts:    opts.CookieHosts,
-		RequestTimeout: opts.RequestTimeout,
-		Transport:      opts.Transport,
-	}, profiles)
-	if err != nil {
-		return nil, configErr(err)
+		res.Warnings = robots.Warnings()
 	}
 
 	// all keeps the list order; only the pairs not skipped are requested.
@@ -190,25 +223,7 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 		}
 	}
 
-	res := &Result{
-		Version:   Version,
-		StartedAt: time.Now(),
-		Warnings:  sourceWarnings,
-		Settings: report.Settings{
-			Source:        src,
-			IgnoreRobots:  opts.FromSitemap != "" && opts.IgnoreRobots,
-			Top:           opts.Top,
-			Concurrency:   opts.Concurrency,
-			RPS:           opts.RPS,
-			RetryInterval: opts.RetryInterval.String(),
-			MaxWait:       opts.MaxWait.String(),
-			RunTimeout:    opts.RunTimeout.String(),
-		},
-	}
-	for _, p := range profiles {
-		res.Settings.Profiles = append(res.Settings.Profiles, p.Name)
-	}
-	outcomes, stopped := verify.Run(ctx, verify.Config{
+	outcomes, runStopped := verify.Run(runCtx, verify.Config{
 		Concurrency:     opts.Concurrency,
 		RPS:             opts.RPS,
 		RetryInterval:   opts.RetryInterval,
@@ -218,6 +233,13 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 	}, pairs, func(ctx context.Context, p verify.Pair) probe.Observation {
 		return prober.Do(ctx, p.URL, p.Profile)
 	})
+	switch {
+	case stopped != nil:
+	case runStopped != nil:
+		stopped = runStopped
+	case len(pairs) == 0 && runCtx.Err() != nil:
+		stopped = runCtx.Err()
+	}
 	res.FinishedAt = time.Now()
 	switch {
 	case stopped == nil:

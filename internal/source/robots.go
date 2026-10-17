@@ -61,6 +61,10 @@ func (r *Robots) Allowed(ctx context.Context, rawURL string) (bool, error) {
 	r.mu.Unlock()
 	if !ok {
 		h = r.load(ctx, u)
+		if h == nil {
+			// Canceled or past the run deadline: says nothing about the host.
+			return false, ctx.Err()
+		}
 		r.mu.Lock()
 		if prev, dup := r.hosts[key]; dup {
 			h = prev
@@ -88,9 +92,13 @@ func (r *Robots) warn(format string, args ...any) {
 	r.mu.Unlock()
 }
 
+// load returns nil when ctx ended before robots.txt was read.
 func (r *Robots) load(ctx context.Context, u *url.URL) *robotsHost {
 	robotsURL := (&url.URL{Scheme: u.Scheme, Host: u.Host, Path: "/robots.txt"}).String()
 	resp, err := r.f.get(ctx, robotsURL)
+	if err != nil && ctx.Err() != nil {
+		return nil
+	}
 	if err != nil {
 		r.warn("%s could not be fetched (%v); its sitemap URLs are skipped-robots", robotsURL, err)
 		return &robotsHost{unavailable: true}
@@ -104,6 +112,9 @@ func (r *Robots) load(ctx context.Context, u *url.URL) *robotsHost {
 		return &robotsHost{unavailable: true}
 	}
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxRobotsBytes))
+	if err != nil && ctx.Err() != nil {
+		return nil
+	}
 	if err != nil {
 		r.warn("%s could not be read (%v); its sitemap URLs are skipped-robots", robotsURL, err)
 		return &robotsHost{unavailable: true}

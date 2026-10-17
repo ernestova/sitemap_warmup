@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/clarivo-co/sitewarm/pkg/sitewarm"
 )
@@ -192,6 +193,61 @@ func TestScanSourcesAreExclusive(t *testing.T) {
 		if !errors.Is(err, sitewarm.ErrConfig) || !errors.Is(err, sitewarm.ErrSource) {
 			t.Errorf("%s: got %v", name, err)
 		}
+	}
+}
+
+// blockingSite blocks on path until the request is canceled; everything
+// else is a HIT page or a one-URL sitemap.
+func blockingSite(t *testing.T, path string) *httptest.Server {
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case path:
+			<-r.Context().Done()
+		case "/sitemap.xml":
+			fmt.Fprintf(w, `<urlset><url><loc>%s/a</loc></url></urlset>`, srv.URL)
+		default:
+			w.Header().Set("Cf-Cache-Status", "HIT")
+			w.Write([]byte("<html><head></head></html>"))
+		}
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// An interrupt while the sitemap is read is a stopped run with a report
+// that fails, not a configuration error.
+func TestScanCanceledWhileReadingSitemap(t *testing.T) {
+	srv := blockingSite(t, "/sitemap.xml")
+	o := fastOptions("")
+	o.TopFrom, o.FromSitemap = "", srv.URL+"/sitemap.xml"
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(100*time.Millisecond, cancel)
+	res, err := sitewarm.Scan(ctx, o)
+	if err != nil {
+		t.Fatalf("got error %v, want a stopped report", err)
+	}
+	if res.Stopped != "canceled" || res.Summary.Total != 0 || res.Summary.Passed {
+		t.Fatalf("stopped %q summary %+v", res.Stopped, res.Summary)
+	}
+}
+
+// --run-timeout also bounds the robots.txt checks, and URLs left unchecked
+// are incomplete, not skipped-robots.
+func TestScanRunTimeoutWhileReadingRobots(t *testing.T) {
+	srv := blockingSite(t, "/robots.txt")
+	o := fastOptions("")
+	o.TopFrom, o.FromSitemap = "", srv.URL+"/sitemap.xml"
+	o.RunTimeout = 200 * time.Millisecond
+	res, err := sitewarm.Scan(context.Background(), o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Stopped != "run-timeout" || res.Summary.ByState[sitewarm.Incomplete] != 2 || res.Summary.ByState[sitewarm.SkippedRobots] != 0 {
+		t.Fatalf("stopped %q: %s", res.Stopped, states(res))
+	}
+	if len(res.Warnings) != 2 {
+		t.Fatalf("a canceled robots.txt fetch must not warn: %v", res.Warnings)
 	}
 }
 

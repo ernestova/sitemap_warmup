@@ -187,12 +187,15 @@ func Build(r *Report, outcomes []verify.Outcome, failOn FailOn) {
 		s.HitRatio = float64(s.ByState[cdn.Hit]) / float64(s.Total)
 	}
 	// A run where nothing was verified never passes, even when
-	// skipped-robots is not in --fail-on.
-	noneVerified := s.Total > 0 && s.ByState[cdn.SkippedRobots] == s.Total
+	// skipped-robots is not in --fail-on. That includes an empty run, such
+	// as one stopped while the sitemap was being read.
+	noneVerified := s.ByState[cdn.SkippedRobots] == s.Total
 	s.Passed = s.Failed == 0 && !noneVerified
 	switch {
 	case s.Failed > 0:
 		s.Verdict = fmt.Sprintf("failed: %d of %d results are in --fail-on", s.Failed, s.Total)
+	case s.Total == 0:
+		s.Verdict = "failed: no URL was verified"
 	case noneVerified:
 		s.Verdict = fmt.Sprintf("failed: no URL was verified; all %d results are skipped-robots", s.Total)
 	default:

@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 )
 
 func sitemapServer(robotsStatus int) *httptest.Server {
@@ -48,6 +51,24 @@ func TestRobots5xxFailsSitemapRun(t *testing.T) {
 	}
 	if !strings.Contains(h.stdout.String(), "no URL was verified") {
 		t.Fatalf("stdout: %s", h.stdout.String())
+	}
+}
+
+// SIGINT while the sitemap is read exits 130 and still writes the report.
+func TestSignalWhileReadingSitemap(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+	h := newHarness()
+	reportPath := filepath.Join(t.TempDir(), "r.json")
+	time.AfterFunc(100*time.Millisecond, func() { h.signals <- syscall.SIGINT })
+	code := run(context.Background(), []string{"scan", "--from-sitemap", srv.URL + "/sitemap.xml", "--report", reportPath}, h.env())
+	if code != 130 {
+		t.Fatalf("exit %d, want 130; stderr: %s", code, h.stderr.String())
+	}
+	if r := readReport(t, reportPath); r["stopped"] != "SIGINT" {
+		t.Fatalf("stopped = %v", r["stopped"])
 	}
 }
 

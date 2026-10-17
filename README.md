@@ -67,7 +67,8 @@ navigation headers of current Chrome stable (Windows and Android) plus a
 crawler. Requests are spread with `--concurrency 4` and a global `--rps 5`
 that also covers retries. A `miss` or `stale` URL is requested again every
 `--retry-interval 10s` until it is a `hit` or `--max-wait 5m` passes. The whole
-run stops at `--run-timeout 15m`.
+run, including reading a sitemap and `robots.txt`, stops at
+`--run-timeout 15m`.
 
 | Flag | Default | |
 |---|---|---|
