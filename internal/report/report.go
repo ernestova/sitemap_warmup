@@ -2,9 +2,11 @@
 package report
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -135,6 +137,8 @@ type Settings struct {
 	MaxWait       string   `json:"max_wait"`
 	RunTimeout    string   `json:"run_timeout"`
 	FailOn        []string `json:"fail_on"`
+	// IgnoreRobots is set when --from-sitemap ran without robots.txt.
+	IgnoreRobots bool `json:"ignore_robots,omitempty"`
 }
 
 // Report is the scan result.
@@ -160,12 +164,13 @@ const (
 	verdictPass   = "cache verified; deploy freshness not verified"
 )
 
-// Build assembles the report from the scheduler outcomes.
+// Build assembles the report from the scheduler outcomes. Warnings already
+// in r (from the URL source) are kept after the standing ones.
 func Build(r *Report, outcomes []verify.Outcome, failOn FailOn) {
 	r.Tool = "sitewarm"
 	r.Settings.FailOn = failOn.List()
 	r.DurationMS = r.FinishedAt.Sub(r.StartedAt).Milliseconds()
-	r.Warnings = []string{WarnSinglePoP, WarnVariants}
+	r.Warnings = append([]string{WarnSinglePoP, WarnVariants}, r.Warnings...)
 	s := Summary{ByState: map[cdn.State]int{}}
 	r.Results = make([]Entry, 0, len(outcomes))
 	for _, o := range outcomes {
@@ -181,13 +186,31 @@ func Build(r *Report, outcomes []verify.Outcome, failOn FailOn) {
 	if s.Total > 0 {
 		s.HitRatio = float64(s.ByState[cdn.Hit]) / float64(s.Total)
 	}
-	s.Passed = s.Failed == 0
-	if s.Passed {
-		s.Verdict = verdictPass
-	} else {
+	// A run where nothing was verified never passes, even when
+	// skipped-robots is not in --fail-on. That includes an empty run, such
+	// as one stopped while the sitemap was being read.
+	noneVerified := s.ByState[cdn.SkippedRobots] == s.Total
+	s.Passed = s.Failed == 0 && !noneVerified
+	switch {
+	case s.Failed > 0:
 		s.Verdict = fmt.Sprintf("failed: %d of %d results are in --fail-on", s.Failed, s.Total)
+	case s.Total == 0:
+		s.Verdict = "failed: no URL was verified"
+	case noneVerified:
+		s.Verdict = fmt.Sprintf("failed: no URL was verified; all %d results are skipped-robots", s.Total)
+	default:
+		s.Verdict = verdictPass
 	}
 	r.Summary = s
+}
+
+// SkippedOutcome is the outcome of a pair that robots.txt kept from being
+// requested.
+func SkippedOutcome(p verify.Pair) verify.Outcome {
+	return verify.Outcome{
+		Pair: p, InitialState: cdn.SkippedRobots, State: cdn.SkippedRobots,
+		Verdict: verify.Verdict{Detail: "not requested: robots.txt disallows it or could not be read"},
+	}
 }
 
 func ms(d time.Duration) *int64 {
@@ -247,6 +270,22 @@ func WriteJSON(w io.Writer, r *Report) error {
 	enc.SetIndent("", "  ")
 	enc.SetEscapeHTML(false)
 	return enc.Encode(r)
+}
+
+// WriteCSV writes one row per result with the columns url,status,state.
+// status is the HTTP status code, empty when there was no response.
+func WriteCSV(w io.Writer, r *Report) error {
+	cw := csv.NewWriter(w)
+	cw.Write([]string{"url", "status", "state"})
+	for _, e := range r.Results {
+		status := ""
+		if e.HTTPStatus != 0 {
+			status = strconv.Itoa(e.HTTPStatus)
+		}
+		cw.Write([]string{e.URL, status, string(e.State)})
+	}
+	cw.Flush()
+	return cw.Error()
 }
 
 // attention lists the states that do not fail by default but are

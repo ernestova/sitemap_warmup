@@ -38,6 +38,7 @@ const (
 	RedirectError       = cdn.RedirectError
 	Incomplete          = cdn.Incomplete
 	Unknown             = cdn.Unknown
+	SkippedRobots       = cdn.SkippedRobots
 )
 
 // Result is the scan report.
@@ -58,6 +59,10 @@ const (
 type Options struct {
 	// TopFrom is the path of the CSV with the URLs, in priority order.
 	TopFrom string
+	// FromSitemap is the URL of a sitemap or sitemap index. It excludes
+	// TopFrom. Its URLs are checked against robots.txt unless IgnoreRobots.
+	FromSitemap  string
+	IgnoreRobots bool
 	// BaseURL resolves a CSV "path" column.
 	BaseURL string
 	// Top keeps the first N URLs of the list.
@@ -116,22 +121,9 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 	if err != nil {
 		return nil, configErr(err)
 	}
-	if opts.TopFrom == "" {
-		return nil, configErr(errors.New("no URL source: use --top-from <file.csv>"))
+	if (opts.TopFrom == "") == (opts.FromSitemap == "") {
+		return nil, configErr(ErrSource)
 	}
-	f, err := os.Open(opts.TopFrom)
-	if err != nil {
-		return nil, configErr(err)
-	}
-	urls, err := source.ReadCSV(f, opts.BaseURL)
-	f.Close()
-	if err != nil {
-		return nil, configErr(fmt.Errorf("%s: %w", opts.TopFrom, err))
-	}
-	if opts.Top > 0 && len(urls) > opts.Top {
-		urls = urls[:opts.Top]
-	}
-
 	profiles, err := selectProfiles(opts)
 	if err != nil {
 		return nil, configErr(err)
@@ -145,18 +137,12 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 		return nil, configErr(err)
 	}
 
-	pairs := make([]verify.Pair, 0, len(urls)*len(profiles))
-	for _, u := range urls {
-		for _, p := range profiles {
-			pairs = append(pairs, verify.Pair{URL: u, Profile: p})
-		}
-	}
-
 	res := &Result{
 		Version:   Version,
 		StartedAt: time.Now(),
 		Settings: report.Settings{
 			Source:        opts.TopFrom,
+			IgnoreRobots:  opts.FromSitemap != "" && opts.IgnoreRobots,
 			Top:           opts.Top,
 			Concurrency:   opts.Concurrency,
 			RPS:           opts.RPS,
@@ -168,7 +154,76 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 	for _, p := range profiles {
 		res.Settings.Profiles = append(res.Settings.Profiles, p.Name)
 	}
-	outcomes, stopped := verify.Run(ctx, verify.Config{
+
+	// --run-timeout covers the whole run: reading the sitemap and robots.txt
+	// as well as warming and verifying.
+	runCtx, cancel := context.WithTimeout(ctx, opts.RunTimeout)
+	defer cancel()
+	fetcher := source.Fetcher{
+		Client:    sourceClient(opts),
+		UserAgent: profiles[0].Header.Get("User-Agent"),
+	}
+
+	var urls []string
+	var stopped error
+	if opts.TopFrom != "" {
+		f, err := os.Open(opts.TopFrom)
+		if err != nil {
+			return nil, configErr(err)
+		}
+		urls, err = source.ReadCSV(f, opts.BaseURL)
+		f.Close()
+		if err != nil {
+			return nil, configErr(fmt.Errorf("%s: %w", opts.TopFrom, err))
+		}
+	} else {
+		res.Settings.Source = opts.FromSitemap
+		urls, err = fetcher.ReadSitemap(runCtx, opts.FromSitemap, opts.Top)
+		switch {
+		case err != nil && runCtx.Err() != nil:
+			// Interrupted or timed out while reading: an empty report that
+			// fails, not a configuration error.
+			urls, stopped = nil, runCtx.Err()
+		case err != nil:
+			return nil, configErr(err)
+		}
+	}
+	if opts.Top > 0 && len(urls) > opts.Top {
+		urls = urls[:opts.Top]
+	}
+
+	// robots.txt is consulted only for sitemap URLs: a --top-from list is
+	// chosen explicitly by its operator.
+	skip := map[string]bool{}
+	if opts.FromSitemap != "" && !opts.IgnoreRobots {
+		robots := fetcher.NewRobots()
+		for _, u := range urls {
+			ok, err := robots.Allowed(runCtx, u)
+			if runCtx.Err() != nil {
+				// Interrupted: the URLs not checked yet are not skipped;
+				// the scheduler reports them incomplete.
+				break
+			}
+			if err != nil || !ok {
+				skip[u] = true
+			}
+		}
+		res.Warnings = robots.Warnings()
+	}
+
+	// all keeps the list order; only the pairs not skipped are requested.
+	all := make([]verify.Pair, 0, len(urls)*len(profiles))
+	var pairs []verify.Pair
+	for _, u := range urls {
+		for _, p := range profiles {
+			all = append(all, verify.Pair{URL: u, Profile: p})
+			if !skip[u] {
+				pairs = append(pairs, verify.Pair{URL: u, Profile: p})
+			}
+		}
+	}
+
+	outcomes, runStopped := verify.Run(runCtx, verify.Config{
 		Concurrency:     opts.Concurrency,
 		RPS:             opts.RPS,
 		RetryInterval:   opts.RetryInterval,
@@ -178,6 +233,13 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 	}, pairs, func(ctx context.Context, p verify.Pair) probe.Observation {
 		return prober.Do(ctx, p.URL, p.Profile)
 	})
+	switch {
+	case stopped != nil:
+	case runStopped != nil:
+		stopped = runStopped
+	case len(pairs) == 0 && runCtx.Err() != nil:
+		stopped = runCtx.Err()
+	}
 	res.FinishedAt = time.Now()
 	switch {
 	case stopped == nil:
@@ -186,8 +248,35 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 	default:
 		res.Stopped = "canceled"
 	}
-	report.Build(res, outcomes, failOn)
+	merged := make([]verify.Outcome, 0, len(all))
+	next := 0
+	for _, p := range all {
+		if skip[p.URL] {
+			merged = append(merged, report.SkippedOutcome(p))
+			continue
+		}
+		merged = append(merged, outcomes[next])
+		next++
+	}
+	report.Build(res, merged, failOn)
 	return res, nil
+}
+
+// ErrSource means zero or several URL sources were given.
+var ErrSource = errors.New("choose exactly one URL source: --top-from <file.csv> or --from-sitemap <url>")
+
+// sourceClient fetches sitemaps and robots.txt. Unlike the probe, it lets
+// Go decode Content-Encoding gzip.
+func sourceClient(opts Options) *http.Client {
+	timeout := opts.RequestTimeout
+	if timeout == 0 {
+		timeout = probe.DefaultRequestTimeout
+	}
+	transport := opts.Transport
+	if transport == nil {
+		transport = http.DefaultTransport.(*http.Transport).Clone()
+	}
+	return &http.Client{Transport: transport, Timeout: timeout}
 }
 
 func selectProfiles(opts Options) ([]probe.Profile, error) {

@@ -82,12 +82,18 @@ func scanCmd(ctx context.Context, e env, code *int) *cobra.Command {
 	opts := sitewarm.DefaultOptions()
 	var format, reportPath string
 	cmd := &cobra.Command{
-		Use:   "scan --top-from <file.csv> [flags]",
+		Use:   "scan (--top-from <file.csv> | --from-sitemap <url>) [flags]",
 		Short: "Warm and verify every URL with the desktop and mobile profiles",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if format != "table" && format != "json" {
-				return fmt.Errorf("--format must be table or json, got %q", format)
+			if format != "table" && format != "json" && format != "csv" {
+				return fmt.Errorf("--format must be table, json or csv, got %q", format)
+			}
+			if (opts.TopFrom == "") == (opts.FromSitemap == "") {
+				return sitewarm.ErrSource
+			}
+			if opts.FromSitemap != "" && opts.IgnoreRobots {
+				fmt.Fprintln(e.stderr, "warning: --ignore-robots set; robots.txt is not checked")
 			}
 			opts.Cookies = map[string]string{}
 			for _, p := range opts.Profiles {
@@ -147,6 +153,8 @@ func scanCmd(ctx context.Context, e env, code *int) *cobra.Command {
 	}
 	f := cmd.Flags()
 	f.StringVar(&opts.TopFrom, "top-from", "", "CSV with a url (or path) column, in priority order")
+	f.StringVar(&opts.FromSitemap, "from-sitemap", "", "sitemap or sitemap index URL (nested indexes and .gz are followed)")
+	f.BoolVar(&opts.IgnoreRobots, "ignore-robots", false, "with --from-sitemap, do not check robots.txt")
 	f.StringVar(&opts.BaseURL, "base-url", "", "base URL for a CSV path column")
 	f.IntVar(&opts.Top, "top", opts.Top, "warm only the first N URLs")
 	f.StringVar(&opts.AcceptLanguage, "accept-language", "", "Accept-Language for the browser presets")
@@ -157,14 +165,17 @@ func scanCmd(ctx context.Context, e env, code *int) *cobra.Command {
 	f.DurationVar(&opts.MaxWait, "max-wait", opts.MaxWait, "how long to keep retrying a miss or stale URL (0 = one request)")
 	f.DurationVar(&opts.RunTimeout, "run-timeout", opts.RunTimeout, "cap for the whole run; unfinished URLs become incomplete")
 	f.StringVar(&opts.FailOn, "fail-on", opts.FailOn, "states that make the run fail (comma-separated; empty = never)")
-	f.StringVar(&format, "format", "table", "stdout format: table or json")
+	f.StringVar(&format, "format", "table", "stdout format: table, json or csv (url,status,state)")
 	f.StringVar(&reportPath, "report", "", "also write the JSON report to this file")
 	return cmd
 }
 
 func writeReport(w io.Writer, res *sitewarm.Result, format string) error {
-	if format == "json" {
+	switch format {
+	case "json":
 		return report.WriteJSON(w, res)
+	case "csv":
+		return report.WriteCSV(w, res)
 	}
 	return report.WriteTable(w, res)
 }
